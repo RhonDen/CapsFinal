@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Map placeholder</title>
+  <desc id="desc">A simple stylized location placeholder.</desc>
+  <rect width="960" height="540" fill="#C1D1DB"/>
+  <path d="M0 350c120-90 210-110 310-60s190 60 290 5 220-70 360 15v230H0Z" fill="#9AB7CD"/>
+  <path d="M0 280c100-50 210-55 300-15s175 40 290-12 235-50 370 28" fill="none" stroke="#5C8EB4" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="500" cy="220" r="55" fill="#0C243D"/>
+  <path d="M500 340c-54-53-82-93-82-122a82 82 0 1 1 164 0c0 29-28 69-82 122Z" fill="#27496A"/>
+</svg>

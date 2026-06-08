@@ -1,0 +1,21 @@
+// Server-side copy of the dental service catalog used for request validation.
+module.exports = [
+  'Routine Dental Checkup - 30 min',
+  'Professional Teeth Cleaning - 45 min',
+  'Tooth Filling Consultation - 40 min',
+  'Dental X-Ray Review - 25 min',
+  'Orthodontic Consultation - 45 min',
+  'Pediatric Dental Visit - 35 min',
+  'Tooth Extraction Assessment - 40 min',
+  'Root Canal Evaluation - 50 min',
+  'Dental Crown Consultation - 45 min',
+  'Teeth Whitening Session - 60 min',
+  'Emergency Dental Visit - 30 min',
+  'Gum Care and Periodontal Check - 45 min',
+  'Denture Fitting Consultation - 50 min',
+  'Dental Implant Consultation - 60 min',
+  'Retainer Adjustment - 20 min',
+  'Oral Surgery Follow-up - 25 min',
+  'Smile Design Consultation - 45 min',
+  'Wisdom Tooth Review - 35 min',
+];
