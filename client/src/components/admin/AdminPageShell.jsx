@@ -9,7 +9,7 @@ function AdminPageShell({
   children,
   backTo = '/admin/dashboard',
   backLabel = 'Dashboard',
-      actions = null,
+  actions = null,
   maxWidth = 'max-w-7xl',
 }) {
   const navigate = useNavigate();
