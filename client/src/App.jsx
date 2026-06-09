@@ -10,6 +10,7 @@ const AdminLogin = lazy(() => import('./pages/AdminLogin.jsx'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard.jsx'));
 const BlockDates = lazy(() => import('./pages/admin/BlockDates.jsx'));
 const Clients = lazy(() => import('./pages/admin/Clients.jsx'));
+const Inbox = lazy(() => import('./pages/admin/Inbox.jsx'));
 const WalkIn = lazy(() => import('./pages/admin/WalkIn.jsx'));
 const DataAnalysis = lazy(() => import('./pages/admin/DataAnalysis.jsx'));
 
@@ -50,6 +51,14 @@ function AppRoutes() {
               element={
                 <ProtectedRoute>
                   <Clients />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/inbox"
+              element={
+                <ProtectedRoute>
+                  <Inbox />
                 </ProtectedRoute>
               }
             />

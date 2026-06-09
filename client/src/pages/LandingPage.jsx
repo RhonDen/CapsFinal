@@ -1,13 +1,19 @@
+import axios from 'axios';
 import { useState } from 'react';
 import {
   ArrowRight,
+  BadgeCheck,
   Calendar,
+  Clock3,
   Facebook,
   Github,
+  HeartPulse,
   Instagram,
   Mail,
   Phone,
-  Twitter,
+  ShieldCheck,
+  Smile,
+  Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AboutClinicSection from '../components/AboutClinicSection.jsx';
@@ -62,88 +68,210 @@ const SplineHero = () => (
 );
 
 function LandingPage() {
-  const [contactSent, setContactSent] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    message: '',
+  });
+  const [contactStatus, setContactStatus] = useState({ type: '', message: '' });
+  const [submitting, setSubmitting] = useState(false);
 
-  // Keep the contact demo local until a live submission endpoint is connected.
-  const handleContactSubmit = (event) => {
+  const handleContactSubmit = async (event) => {
     event.preventDefault();
-    setContactSent(true);
+
+    if (!contactForm.name.trim() || !contactForm.email.trim()) {
+      setContactStatus({
+        type: 'error',
+        message: 'Please add your name and email before sending the message.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    setContactStatus({ type: '', message: '' });
+
+    try {
+      const response = await axios.post('/api/contact/messages', contactForm);
+      setContactStatus({ type: 'success', message: response.data.message });
+      setContactForm({ name: '', email: '', message: '' });
+    } catch (requestError) {
+      setContactStatus({
+        type: 'error',
+        message: requestError.response?.data?.error || 'Unable to send your message right now.',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleContactChange = (event) => {
+    const { name, value } = event.target;
+    setContactForm((current) => ({ ...current, [name]: value }));
+    if (contactStatus.message) {
+      setContactStatus({ type: '', message: '' });
+    }
   };
 
   return (
-    <div className="relative min-h-screen bg-white dark:bg-slate-900 dark:text-slate-100">
+    <div className="relative min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f7fbff_0%,#f9fcff_100%)] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <PublicDarkModeToggle />
 
-      <section className="relative overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(154,183,205,0.35),_transparent_35%),linear-gradient(135deg,_#0C243D,_#16395b)] px-6 py-24 text-center text-white dark:text-slate-100">
+      <section className="relative isolate overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(142,199,234,0.45),_transparent_28%),linear-gradient(135deg,_#0C243D,_#16395b_48%,_#2d5d8a_100%)] px-6 py-24 text-white sm:px-8 lg:px-10 dark:text-slate-100">
         <SplineHero />
 
-        <div className="relative mx-auto max-w-5xl">
-  
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.18),transparent_24%)]" />
+        <div className="absolute -left-10 top-16 h-40 w-40 rounded-full bg-cyan-300/20 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-56 w-56 rounded-full bg-sky-400/20 blur-3xl" />
 
-          <h1 className="mb-4 text-4xl font-bold leading-tight tracking-tight md:text-6xl">
-            Seamless Appointments,
-            <br />
-            Simplified.
-          </h1>
+        <div className="relative mx-auto max-w-6xl">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium backdrop-blur">
+            <Sparkles className="h-4 w-4 text-cyan-200" />
+            Trusted care, made effortless
+          </div>
 
-          <p className="mx-auto mb-8 max-w-2xl text-lg text-periwinkle md:text-xl">
-            Book your visit securely with SMS verification. Fast,
-            professional, and always on time.
-          </p>
+          <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="text-left">
+              <h1 className="mb-3 text-4xl font-bold leading-tight tracking-tight md:text-6xl">
+                Dents-City
+              </h1>
+              <p className="mb-4 max-w-2xl text-lg font-medium text-cyan-100 md:text-xl">
+                In a city full of smiles, we care with warmth, clarity, and confidence.
+              </p>
 
-          <Link
-            to="/booking"
-            className="inline-flex items-center rounded-full bg-silver-lake px-8 py-3 text-lg font-semibold text-white shadow-lg transition-colors hover:bg-wild-blue"
-          >
-            <Calendar className="mr-2 h-5 w-5" />
-            Book Now
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Link>
+              <p className="mx-auto mb-8 max-w-2xl text-lg text-cyan-50/90 md:text-xl lg:mx-0">
+                Book your dental appointment in minutes, receive fast SMS confirmation,
+                and enjoy a polished experience designed around comfort and trust.
+              </p>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  to="/booking"
+                  className="inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-lg font-semibold text-maastricht shadow-lg transition hover:-translate-y-0.5 hover:bg-cyan-50"
+                >
+                  <Calendar className="mr-2 h-5 w-5" />
+                  Book Now
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+                <a
+                  href="#services"
+                  className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/10 px-7 py-3 text-lg font-semibold text-white backdrop-blur transition hover:bg-white/20"
+                >
+                  Explore Services
+                </a>
+              </div>
+            </div>
+
+            <div className="rounded-[30px] border border-white/15 bg-white/10 p-6 shadow-[0_18px_60px_rgba(3,15,34,0.25)] backdrop-blur">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="rounded-2xl bg-white/15 p-3">
+                  <Smile className="h-6 w-6 text-cyan-100" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-100">
+                    What you can expect
+                  </p>
+                  <p className="text-xl font-semibold text-white">
+                    Comfort, clarity, and care in every visit
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  {
+                    title: 'Online booking',
+                    text: 'Reserve your appointment quickly with a simple, guided flow.',
+                    icon: ShieldCheck,
+                  },
+                  {
+                    title: 'Services you need',
+                    text: 'From preventive care to restorative treatment, everything is clearly laid out.',
+                    icon: Clock3,
+                  },
+                  {
+                    title: 'Open communication',
+                    text: 'We keep patients informed, supported, and comfortable at every step.',
+                    icon: HeartPulse,
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.title}
+                    className="flex gap-3 rounded-2xl border border-white/10 bg-slate-950/15 p-4"
+                  >
+                    <div className="mt-0.5 rounded-xl bg-white/15 p-2">
+                      <item.icon className="h-4 w-4 text-cyan-100" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-white">{item.title}</p>
+                      <p className="text-sm text-cyan-50/80">{item.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {[
+              { label: 'Same-day booking', value: '24/7' },
+              { label: 'Patient satisfaction', value: '98%' },
+              { label: 'Verified care', value: 'Secure' },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                <p className="text-sm text-cyan-100">{stat.label}</p>
+                <p className="mt-1 text-2xl font-semibold text-white">{stat.value}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       <AboutClinicSection />
 
-      {/* Services (no price) */}
-      <section id="services" className="bg-periwinkle px-6 py-20 dark:bg-slate-900">
+      <section id="services" className="px-6 py-20 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-6xl">
           <SectionHeading title="Our Services" />
 
-          <p className="max-w-3xl text-lg leading-relaxed text-police dark:text-slate-200">
-            From preventive care to restorative treatment planning, the clinic
-            offers dental services that support healthy smiles at every stage.
-          </p>
+          <div className="mt-6 rounded-[32px] border border-slate-200/80 bg-white/80 p-8 shadow-[0_20px_60px_-28px_rgba(12,36,61,0.22)] backdrop-blur dark:border-slate-700 dark:bg-slate-900/70">
+            <p className="max-w-3xl text-lg leading-relaxed text-police dark:text-slate-200">
+              From preventive care to restorative treatment planning, the clinic offers
+              dental services that support healthy smiles at every stage.
+            </p>
 
-          <div className="mt-8 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-            {FEATURED_SERVICES.map((service) => {
-              const [name, duration] = formatServiceLabel(service).split(' - ');
+            <div className="mt-8 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
+              {FEATURED_SERVICES.map((service) => {
+                const [name, duration] = formatServiceLabel(service).split(' - ');
 
-              return (
-                <div
-                  key={service}
-                  className="rounded-2xl bg-white p-8 shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:bg-slate-800"
-                >
-                  <h3 className="mb-2 text-xl font-semibold text-maastricht dark:text-slate-100">
-                    {name}
-                  </h3>
-                  <p className="text-police dark:text-slate-200">
-                    Duration: {duration}
-                  </p>
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={service}
+                    className="group rounded-[24px] border border-slate-200/80 bg-[linear-gradient(145deg,#ffffff,#f5fbff)] p-8 shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:border-slate-700 dark:bg-slate-800/80"
+                  >
+                    <div className="mb-4 inline-flex rounded-2xl bg-cyan-50 p-3 text-cyan-700 transition group-hover:scale-105 dark:bg-slate-700 dark:text-cyan-200">
+                      <BadgeCheck className="h-5 w-5" />
+                    </div>
+                    <h3 className="mb-2 text-xl font-semibold text-maastricht dark:text-slate-100">
+                      {name}
+                    </h3>
+                    <p className="text-police dark:text-slate-200">
+                      Duration: {duration}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-20">
+      <section className="mx-auto max-w-6xl px-6 py-20 sm:px-8 lg:px-10">
         <SectionHeading title="Meet Our Team" />
 
         <div className="mt-8 grid gap-8 md:grid-cols-3">
           {team.map((member) => (
             <div
               key={member.name}
-              className="overflow-hidden rounded-2xl bg-white shadow-md dark:bg-slate-800"
+              className="overflow-hidden rounded-[28px] border border-slate-200/70 bg-white shadow-[0_16px_40px_-24px_rgba(12,36,61,0.28)] transition hover:-translate-y-1 hover:shadow-[0_24px_50px_-20px_rgba(12,36,61,0.32)] dark:border-slate-700 dark:bg-slate-800"
             >
               <img
                 src={member.photo}
@@ -155,7 +283,7 @@ function LandingPage() {
                 <h3 className="text-xl font-semibold text-maastricht dark:text-slate-100">
                   {member.name}
                 </h3>
-                <p className="mb-4 text-silver-lake dark:text-silver-lake">
+                <p className="mb-4 text-silver-lake dark:text-cyan-200">
                   {member.role}
                 </p>
 
@@ -164,7 +292,7 @@ function LandingPage() {
                     href={member.facebook}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-police transition hover:text-silver-lake dark:text-slate-200 dark:hover:text-silver-lake"
+                    className="text-police transition hover:text-silver-lake dark:text-slate-200 dark:hover:text-cyan-200"
                     aria-label={`${member.name} Facebook`}
                   >
                     <Facebook className="h-5 w-5" />
@@ -173,7 +301,7 @@ function LandingPage() {
                     href={member.instagram}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-police transition hover:text-silver-lake dark:text-slate-200 dark:hover:text-silver-lake"
+                    className="text-police transition hover:text-silver-lake dark:text-slate-200 dark:hover:text-cyan-200"
                     aria-label={`${member.name} Instagram`}
                   >
                     <Instagram className="h-5 w-5" />
@@ -182,7 +310,7 @@ function LandingPage() {
                     href={member.github}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-police transition hover:text-silver-lake dark:text-slate-200 dark:hover:text-silver-lake"
+                    className="text-police transition hover:text-silver-lake dark:text-slate-200 dark:hover:text-cyan-200"
                     aria-label={`${member.name} GitHub`}
                   >
                     <Github className="h-5 w-5" />
@@ -194,49 +322,82 @@ function LandingPage() {
         </div>
       </section>
 
-      <section
-        id="contact"
-        className="bg-periwinkle px-6 py-20 dark:bg-slate-900"
-      >
-        <div className="mx-auto max-w-3xl">
+      <section id="contact" className="px-6 py-20 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-6xl">
           <SectionHeading title="Contact" icon={Mail} />
 
-          <div className="rounded-2xl bg-white p-8 shadow-md dark:bg-slate-800">
-            <form className="space-y-5" onSubmit={handleContactSubmit}>
-              <input
-                type="text"
-                placeholder="Your Name"
-                className="w-full rounded-xl border border-gray-200 bg-white p-3 text-police focus:outline-silver-lake dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
-                required
-              />
-              <input
-                type="email"
-                placeholder="Email Address"
-                className="w-full rounded-xl border border-gray-200 bg-white p-3 text-police focus:outline-silver-lake dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
-                required
-              />
-              <textarea
-                rows={4}
-                placeholder="Your Message"
-                className="w-full rounded-xl border border-gray-200 bg-white p-3 text-police focus:outline-silver-lake dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
-                required
-              />
-
-              <button
-                type="submit"
-                className="flex items-center justify-center gap-2 rounded-xl bg-maastricht px-8 py-3 font-semibold text-white transition hover:bg-police dark:bg-slate-700 dark:hover:bg-slate-600"
-              >
-                <Phone className="h-5 w-5" />
-                Send Message
-              </button>
-            </form>
-
-            {contactSent ? (
-              <p className="mt-4 text-sm text-green-700 dark:text-emerald-300">
-                Message captured locally. Connect this form to your preferred
-                support channel when you are ready.
+          <div className="grid gap-8 rounded-[32px] border border-slate-200/80 bg-white/80 p-8 shadow-[0_20px_60px_-28px_rgba(12,36,61,0.22)] backdrop-blur lg:grid-cols-[0.85fr_1.15fr] dark:border-slate-700 dark:bg-slate-900/70">
+            <div className="rounded-[24px] bg-[linear-gradient(135deg,#0C243D,#2d5d8a)] p-8 text-white">
+              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.28em] text-cyan-100">
+                We’re here to help
               </p>
-            ) : null}
+              <h3 className="mb-4 text-2xl font-semibold">
+                Friendly support for every step of your dental care journey.
+              </h3>
+              <p className="mb-6 text-cyan-50/90">
+                Whether you need a routine cleaning or a restorative visit, our team is ready to help you feel confident in your plan.
+              </p>
+              <div className="space-y-3 text-sm text-cyan-50/90">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  +63 912 345 6789
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  hello@dents-city.com
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-6 dark:border-slate-700 dark:bg-slate-800/70">
+              <form className="space-y-5" onSubmit={handleContactSubmit}>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Your Name"
+                  value={contactForm.name}
+                  onChange={handleContactChange}
+                  className="w-full rounded-xl border border-gray-200 bg-white p-3 text-police focus:outline-silver-lake dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  required
+                />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Email Address"
+                  value={contactForm.email}
+                  onChange={handleContactChange}
+                  className="w-full rounded-xl border border-gray-200 bg-white p-3 text-police focus:outline-silver-lake dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  required
+                />
+                <textarea
+                  rows={4}
+                  name="message"
+                  placeholder="Your Message"
+                  value={contactForm.message}
+                  onChange={handleContactChange}
+                  className="w-full rounded-xl border border-gray-200 bg-white p-3 text-police focus:outline-silver-lake dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  required
+                />
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-maastricht px-8 py-3 font-semibold text-white transition hover:bg-police disabled:cursor-not-allowed disabled:opacity-70 dark:bg-slate-700 dark:hover:bg-slate-600"
+                >
+                  <Phone className="h-5 w-5" />
+                  {submitting ? 'Sending...' : 'Send Message'}
+                </button>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Messages are sent directly to the admin inbox.
+                </p>
+              </form>
+
+              {contactStatus.message ? (
+                <p className={`mt-4 text-sm ${contactStatus.type === 'success' ? 'text-green-700 dark:text-emerald-300' : 'text-red-700 dark:text-rose-300'}`}>
+                  {contactStatus.message}
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
       </section>

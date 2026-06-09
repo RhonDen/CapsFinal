@@ -9,6 +9,7 @@ const { connectDatabase } = require('./utils/database');
 const ensureDefaultAdmin = require('./utils/ensureDefaultAdmin');
 const bookingsRoute = require('./routes/bookings');
 const adminRoute = require('./routes/admin');
+const contactRoute = require('./routes/contact');
 
 const app = express();
 
@@ -61,6 +62,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/bookings', bookingsRoute);
+app.use('/api/contact', contactRoute);
 app.use('/api/admin', adminRoute);
 
 app.use((error, req, res, next) => {

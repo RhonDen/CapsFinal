@@ -164,6 +164,14 @@ function DataAnalysis() {
             </select>
           </>
         )}
+
+        {/* If the API fails or returns no data, render something visible instead of blank charts. */}
+        {data && data.pie && data.pie.length === 0 && data.line && data.line.length === 0 && data.bar && data.bar.length === 0 ? (
+          <div className="col-span-2 mt-3 rounded-xl border border-dashed border-mist bg-pearl p-4 text-sm text-police">
+            No analytics data found for the selected range.
+          </div>
+        ) : null}
+
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

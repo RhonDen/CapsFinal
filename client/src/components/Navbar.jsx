@@ -5,6 +5,7 @@ import {
   CalendarX,
   LayoutDashboard,
   LogOut,
+  Mail,
   Moon,
   ShieldCheck,
   Sun,
@@ -39,6 +40,7 @@ function Navbar() {
     { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/admin/block-dates', label: 'Block Dates', icon: CalendarX },
     { to: '/admin/clients', label: 'Clients', icon: Users },
+    { to: '/admin/inbox', label: 'Inbox', icon: Mail },
     { to: '/admin/walk-in', label: 'Walk-in', icon: UserPlus },
     { to: '/admin/data-analysis', label: 'Analytics', icon: BarChart3 },
   ];

@@ -166,6 +166,7 @@ router.get(
 
 router.post(
   '/request-otp',
+
   [
     body('number')
       .trim()
@@ -194,6 +195,7 @@ router.post(
       .withMessage('A valid appointment time is required.'),
   ],
   asyncHandler(async (req, res) => {
+
     if (!validate(req, res)) {
       return;
     }

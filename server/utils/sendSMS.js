@@ -6,11 +6,18 @@ const axios = require('axios');
  */
 const sendSMS = async (phone, message) => {
   try {
-    const response = await axios.post('https://api.unisender.com/en/api/sendSms', {
+    const payload = new URLSearchParams({
       api_key: process.env.UNI_SMS_API_KEY,
       phone,
-      sender: process.env.UNI_SMS_SENDER_ID,
+      sender: process.env.UNI_SMS_SENDER_ID || 'AppointEase',
       text: message,
+      format: 'json',
+    });
+
+    const response = await axios.post('https://api.unisender.com/en/api/sendSms', payload.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
     });
 
     return response.data;

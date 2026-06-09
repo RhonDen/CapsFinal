@@ -168,12 +168,14 @@ function WalkIn() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             name="number"
-            placeholder="Phone Number *"
+            placeholder="0917-555-0123"
             value={form.number}
             onChange={handleChange}
             required
+            inputMode="tel"
             className="w-full rounded-xl border p-3"
           />
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input
               name="lastName"

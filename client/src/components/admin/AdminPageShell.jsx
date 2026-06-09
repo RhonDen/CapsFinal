@@ -51,7 +51,18 @@ function AdminPageShell({
                 </div>
               ) : null}
 
-              <div />
+              <div className="min-w-0">
+                {title ? (
+                  <h1 className="text-2xl font-semibold text-maastricht dark:text-slate-100">
+                    {title}
+                  </h1>
+                ) : null}
+                {description ? (
+                  <p className="mt-1 text-sm text-police dark:text-slate-400">
+                    {description}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </div>
 

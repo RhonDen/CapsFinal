@@ -6,6 +6,7 @@ import {
   Clock3,
   LayoutDashboard,
   Loader2,
+  Mail,
   UserPlus,
   Users,
   XCircle,
@@ -33,6 +34,12 @@ const QUICK_LINKS = [
     label: 'Clients',
     icon: Users,
     tone: 'bg-police text-white hover:bg-maastricht',
+  },
+  {
+    to: '/admin/inbox',
+    label: 'Inbox',
+    icon: Mail,
+    tone: 'bg-emerald-600 text-white hover:bg-emerald-700',
   },
   {
     to: '/admin/walk-in',

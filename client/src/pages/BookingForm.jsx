@@ -130,6 +130,13 @@ function BookingForm() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
+
+    if (name === 'number') {
+      const digitsOnly = value.replace(/\D/g, '').slice(0, 11);
+      setForm((current) => ({ ...current, number: digitsOnly }));
+      return;
+    }
+
     setForm((current) => ({ ...current, [name]: value }));
   };
 
@@ -263,11 +270,21 @@ function BookingForm() {
                 </label>
                 <input
                   name="number"
-                  type="tel"
-                  placeholder="09XXXXXXXXX"
+                  type="text"
+                  placeholder="09175550123"
                   value={form.number}
                   onChange={handleChange}
                   required
+                  inputMode="numeric"
+                  maxLength={11}
+                  pattern="[0-9]{11}"
+                  onBlur={() => {
+                    const raw = (form.number || '').replace(/\D/g, '');
+                    if (raw.length === 11) {
+                      const formatted = `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 11)}`;
+                      setForm((c) => ({ ...c, number: formatted }));
+                    }
+                  }}
                   className="w-full rounded-2xl border border-gray-200 bg-white p-3 focus:border-silver-lake focus:outline-none focus:ring-4 focus:ring-silver-lake/15"
                 />
               </div>
