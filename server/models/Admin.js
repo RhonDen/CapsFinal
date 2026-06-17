@@ -1,8 +1,14 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../utils/database');
 
-const adminSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true },
-  passwordHash: { type: String, required: true },
-});
+const Admin = sequelize.define(
+  'Admin',
+  {
+    id: { type: DataTypes.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
+    username: { type: DataTypes.STRING, allowNull: false, unique: true },
+    passwordHash: { type: DataTypes.STRING, allowNull: false },
+  },
+  { tableName: 'Admins' }
+);
 
-module.exports = mongoose.model('Admin', adminSchema);
+module.exports = Admin;

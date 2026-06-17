@@ -1,33 +1,43 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../utils/database');
 
-// Each document represents a booking request or an accepted walk-in record.
-const appointmentSchema = new mongoose.Schema({
-  serialNumber: { type: Number, unique: true, sparse: true },
-  number: { type: String, required: true },
-  lastName: { type: String, required: true },
-  firstName: { type: String, required: true },
-  middleInitial: { type: String, default: '' },
-  service: { type: String, required: true },
-  email: { type: String, default: '' },
-  date: { type: Date, default: Date.now },
-  dateKey: { type: String, default: null, index: true },
-  time: { type: String, default: null },
-  durationMinutes: { type: Number, default: null },
-  scheduledStart: { type: Date, default: null },
-  scheduledEnd: { type: Date, default: null },
-  status: {
-    type: String,
-    enum: ['pending', 'accepted', 'rejected', 'completed', 'notCompleted'],
-    default: 'pending',
+// Each record represents a booking request or an accepted walk-in record.
+const Appointment = sequelize.define(
+  'Appointment',
+  {
+    id: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      autoIncrement: true,
+      primaryKey: true,
+    },
+    serialNumber: { type: DataTypes.INTEGER, unique: true, allowNull: true },
+    number: { type: DataTypes.STRING, allowNull: false },
+    lastName: { type: DataTypes.STRING, allowNull: false },
+    firstName: { type: DataTypes.STRING, allowNull: false },
+    middleInitial: { type: DataTypes.STRING, allowNull: true },
+    service: { type: DataTypes.STRING, allowNull: false },
+    email: { type: DataTypes.STRING, allowNull: true },
+    date: { type: DataTypes.DATE, allowNull: true },
+    dateKey: { type: DataTypes.STRING, allowNull: true },
+    time: { type: DataTypes.STRING, allowNull: true },
+    durationMinutes: { type: DataTypes.INTEGER, allowNull: true },
+    scheduledStart: { type: DataTypes.DATE, allowNull: true },
+    scheduledEnd: { type: DataTypes.DATE, allowNull: true },
+    status: {
+      type: DataTypes.ENUM('pending', 'accepted', 'rejected', 'completed', 'notCompleted'),
+      defaultValue: 'pending',
+    },
+    otp: { type: DataTypes.STRING, allowNull: true },
+    otpExpires: { type: DataTypes.DATE, allowNull: true },
+    verifiedAt: { type: DataTypes.DATE, allowNull: true },
+    notes: { type: DataTypes.TEXT, allowNull: true },
+    isWalkIn: { type: DataTypes.BOOLEAN, defaultValue: false },
+    historyOtp: { type: DataTypes.STRING, allowNull: true },
+    historyOtpExpires: { type: DataTypes.DATE, allowNull: true },
   },
-  otp: { type: String, default: null },
-  otpExpires: { type: Date, default: null },
-  verifiedAt: { type: Date, default: null },
-  notes: { type: String, default: '' },
-  isWalkIn: { type: Boolean, default: false },
-  historyOtp: { type: String, default: null },
-  historyOtpExpires: { type: Date, default: null },
-  createdAt: { type: Date, default: Date.now },
-});
+  {
+    tableName: 'Appointments',
+  }
+);
 
-module.exports = mongoose.model('Appointment', appointmentSchema);
+module.exports = Appointment;

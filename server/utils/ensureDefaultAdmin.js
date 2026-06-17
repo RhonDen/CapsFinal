@@ -1,5 +1,4 @@
 const bcrypt = require('bcryptjs');
-const Admin = require('../models/Admin');
 
 // Create a default admin automatically in local development when no admin account exists yet.
 async function ensureDefaultAdmin() {
@@ -7,9 +6,13 @@ async function ensureDefaultAdmin() {
     return;
   }
 
+  // Require the model lazily after the DB connection is established to avoid circular
+  // dependency issues where models import the DB before it's initialized.
+  const Admin = require('../models/Admin');
+
   const username = process.env.DEFAULT_ADMIN_USERNAME || 'admin';
   const password = process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
-  const existingAdmin = await Admin.findOne({ username });
+  const existingAdmin = await Admin.findOne({ where: { username } });
 
   if (existingAdmin) {
     return;

@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, param, validationResult } = require('express-validator');
+const { Op } = require('sequelize');
 const auth = require('../middleware/auth');
 const ContactMessage = require('../models/ContactMessage');
 
@@ -34,9 +35,13 @@ router.post(
     const { name, email, message } = req.body;
     const normalizedEmail = email.toLowerCase().trim();
     const windowStart = new Date(Date.now() - 15 * 60 * 1000);
-    const recentCount = await ContactMessage.countDocuments({
-      email: normalizedEmail,
-      createdAt: { $gte: windowStart },
+    const recentCount = await ContactMessage.count({
+      where: {
+        email: normalizedEmail,
+        createdAt: {
+          [Op.gte]: windowStart,
+        },
+      },
     });
 
     if (recentCount >= 2) {
@@ -55,7 +60,7 @@ router.post(
     return res.status(201).json({
       message: 'Your message has been sent to the admin inbox.',
       data: {
-        id: createdMessage._id,
+        id: createdMessage.id,
         name: createdMessage.name,
         email: createdMessage.email,
         createdAt: createdMessage.createdAt,
@@ -68,34 +73,33 @@ router.get(
   '/messages',
   auth,
   asyncHandler(async (req, res) => {
-    const messages = await ContactMessage.find({})
-      .sort({ createdAt: -1 })
-      .lean();
+    const messages = await ContactMessage.findAll({
+      order: [['createdAt', 'DESC']],
+    });
 
-    return res.json({ messages });
+    return res.json({ messages: messages.map((message) => message.toJSON()) });
   })
 );
 
 router.patch(
   '/messages/:id/read',
   auth,
-  [param('id').isMongoId().withMessage('Invalid message id.')],
+  [param('id').isInt().withMessage('Invalid message id.')],
   asyncHandler(async (req, res) => {
     if (!validate(req, res)) {
       return;
     }
 
-    const message = await ContactMessage.findByIdAndUpdate(
-      req.params.id,
-      { read: true },
-      { new: true }
-    );
+    const message = await ContactMessage.findByPk(req.params.id);
 
     if (!message) {
       return res.status(404).json({ error: 'Message not found.' });
     }
 
-    return res.json({ message });
+    message.read = true;
+    await message.save();
+
+    return res.json({ message: message.toJSON() });
   })
 );
 

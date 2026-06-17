@@ -3,11 +3,11 @@ const bcrypt = require('bcryptjs');
 const Admin = require('./models/Admin');
 const { connectDatabase, disconnectDatabase } = require('./utils/database');
 
-// Seed a persistent admin account into the configured MongoDB instance.
+// Seed a persistent admin account into the configured MySQL instance.
 const seed = async () => {
-  await connectDatabase({ allowMemoryFallback: false });
+  await connectDatabase();
 
-  const existingAdmin = await Admin.findOne({ username: 'admin' });
+  const existingAdmin = await Admin.findOne({ where: { username: 'admin' } });
 
   if (existingAdmin) {
     console.log('Admin already exists.');

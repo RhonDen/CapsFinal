@@ -1,58 +1,96 @@
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { Sequelize } = require('sequelize');
+const path = require('path');
 
-let memoryServer = null;
+const dialect = process.env.DB_DIALECT || 'sqlite';
+const host = process.env.DB_HOST || 'localhost';
+const port = process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306;
+const database = process.env.DB_NAME || 'appointease';
+const username = process.env.DB_USER || 'root';
+const password = process.env.DB_PASSWORD || '';
+const sqliteStorage = process.env.SQLITE_STORAGE || path.join(__dirname, '..', 'database.sqlite');
 
-// Connect to the configured MongoDB instance and fall back to an in-memory database for local development.
-async function connectDatabase(options = {}) {
-  const {
-    allowMemoryFallback = process.env.NODE_ENV !== 'production',
-  } = options;
+let sequelize;
+if (dialect === 'sqlite') {
+  sequelize = new Sequelize({
+    dialect: 'sqlite',
+    storage: sqliteStorage,
+    logging: false,
+    define: {
+      timestamps: true,
+    },
+  });
+} else {
+  sequelize = new Sequelize(database, username, password, {
+    host,
+    port,
+    dialect: 'mysql',
+    logging: false,
+    define: {
+      timestamps: true,
+    },
+  });
+}
 
-  const mongoUri = process.env.MONGODB_URI;
-  const connectionOptions = {
-    serverSelectionTimeoutMS: 5000,
-  };
-
+async function connectDatabase() {
   try {
-    await mongoose.connect(mongoUri, connectionOptions);
+    await sequelize.authenticate();
+
+    // Load models so they register with Sequelize
+    require('../models/Appointment');
+    require('../models/BlockedDate');
+    require('../models/Admin');
+    require('../models/ContactMessage');
+    require('../models/Counter');
+
+    // Sync models (creates tables if missing)
+    await sequelize.sync();
 
     return {
-      mode: 'persistent',
-      uri: mongoUri,
+      mode: dialect,
+      uri: dialect === 'sqlite' ? sqliteStorage : `${username}@${host}:${port}/${database}`,
     };
   } catch (error) {
-    if (!allowMemoryFallback) {
-      throw error;
+    if (dialect === 'mysql') {
+      console.error('MySQL connection error:', error);
+      console.error('Falling back to SQLite for local development.');
+      const sqliteSequelize = new Sequelize({
+        dialect: 'sqlite',
+        storage: sqliteStorage,
+        logging: false,
+        define: {
+          timestamps: true,
+        },
+      });
+      sequelize = sqliteSequelize;
+
+      await sequelize.authenticate();
+      require('../models/Appointment');
+      require('../models/BlockedDate');
+      require('../models/Admin');
+      require('../models/ContactMessage');
+      require('../models/Counter');
+      await sequelize.sync();
+
+      module.exports.sequelize = sequelize;
+      return {
+        mode: 'sqlite',
+        uri: sqliteStorage,
+      };
     }
 
-    console.warn(
-      'MongoDB is unavailable. Starting an in-memory MongoDB instance for local development.'
-    );
-
-    memoryServer = await MongoMemoryServer.create();
-    const memoryUri = memoryServer.getUri();
-
-    await mongoose.connect(memoryUri, connectionOptions);
-
-    return {
-      mode: 'memory',
-      uri: memoryUri,
-    };
+    console.error('Database connection error:', error);
+    throw error;
   }
 }
 
-// Disconnect from Mongoose and stop the in-memory database when one was created.
 async function disconnectDatabase() {
-  await mongoose.disconnect();
-
-  if (memoryServer) {
-    await memoryServer.stop();
-    memoryServer = null;
+  if (sequelize) {
+    await sequelize.close();
   }
 }
 
 module.exports = {
   connectDatabase,
   disconnectDatabase,
+  sequelize,
 };

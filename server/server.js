@@ -6,11 +6,8 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('mongo-sanitize');
 const cookieParser = require('cookie-parser');
 const { connectDatabase } = require('./utils/database');
-const ensureDefaultAdmin = require('./utils/ensureDefaultAdmin');
-const bookingsRoute = require('./routes/bookings');
-const adminRoute = require('./routes/admin');
-const contactRoute = require('./routes/contact');
-
+// Note: `ensureDefaultAdmin` and route modules are required after DB
+// initialization inside startServer to avoid circular model imports.
 const app = express();
 
 app.disable('x-powered-by');
@@ -61,9 +58,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.use('/api/bookings', bookingsRoute);
-app.use('/api/contact', contactRoute);
-app.use('/api/admin', adminRoute);
+// Routes are registered after DB connects (see startServer)
 
 app.use((error, req, res, next) => {
   void next;
@@ -75,12 +70,25 @@ app.use((error, req, res, next) => {
 const startServer = async () => {
   try {
     const database = await connectDatabase();
+
+    // Require and run ensureDefaultAdmin after DB connects so models are available.
+    const ensureDefaultAdmin = require('./utils/ensureDefaultAdmin');
     await ensureDefaultAdmin();
 
+    // Now require and register routes; requiring them earlier could cause models
+    // to be imported before `sequelize` is initialized and leads to `null`.
+    const bookingsRoute = require('./routes/bookings');
+    const adminRoute = require('./routes/admin');
+    const contactRoute = require('./routes/contact');
+
+    app.use('/api/bookings', bookingsRoute);
+    app.use('/api/contact', contactRoute);
+    app.use('/api/admin', adminRoute);
+
     console.log(
-      database.mode === 'memory'
-        ? 'Connected to in-memory MongoDB for development.'
-        : 'Connected to MongoDB.'
+      database.mode === 'sqlite'
+        ? `Connected to SQLite at ${database.uri}`
+        : `Connected to MySQL at ${database.uri}`
     );
 
     const port = process.env.PORT || 5000;

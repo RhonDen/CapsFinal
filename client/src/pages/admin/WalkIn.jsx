@@ -37,7 +37,7 @@ function WalkIn() {
       if (!form.service || !form.date) {
         setAvailableSlots([]);
         setSlotMessage('Select a service and date to view open times.');
-        setForm((current) => (current.time ? { ...current, time: '' } : current));
+        setForm((current) => ({ ...current, time: '' }));
         return;
       }
 
@@ -58,14 +58,18 @@ function WalkIn() {
 
         const slots = response.data.availableSlots || [];
         setAvailableSlots(slots);
-        setForm((current) => {
-          const nextTime = slots.includes(current.time) ? current.time : slots[0] || '';
 
-          if (current.time === nextTime) {
-            return current;
+        // Keep time selection consistent with the returned slot list.
+        // If the existing time doesn't exist in the new slots, reset to the first slot.
+        setForm((current) => {
+          if (!current.time || slots.length === 0) {
+            return { ...current, time: '' };
           }
 
-          return { ...current, time: nextTime };
+          return {
+            ...current,
+            time: slots.includes(current.time) ? current.time : slots[0] || '',
+          };
         });
 
         if (response.data.isDateBlocked) {

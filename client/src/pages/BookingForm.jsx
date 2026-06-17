@@ -146,8 +146,16 @@ function BookingForm() {
     setError('');
     setSuccess('');
 
+    // Backend expects exactly 11 digits starting with 09 (regex: /^09\d{9}$/)
+    // Remove any formatting (ex: dashes) before sending.
+    const payload = {
+      ...form,
+      number: (form.number || '').toString().replace(/\D/g, '').slice(0, 11),
+    };
+
     try {
-      const response = await axios.post('/api/bookings/request-otp', form);
+      const response = await axios.post('/api/bookings/request-otp', payload);
+
       setSuccess(response.data.message);
       setStep(2);
     } catch (requestError) {
@@ -164,10 +172,13 @@ function BookingForm() {
     setSuccess('');
 
     try {
-      const response = await axios.post('/api/bookings/verify-otp', {
-        number: form.number,
+      const payload = {
+        number: (form.number || '').toString().replace(/\D/g, '').slice(0, 11),
         otp,
-      });
+      };
+
+      const response = await axios.post('/api/bookings/verify-otp', payload);
+
       const serialText = response.data.serialNumber
         ? ` Request #${response.data.serialNumber} is now waiting for admin approval.`
         : ' Your request is now waiting for admin approval.';
@@ -279,12 +290,11 @@ function BookingForm() {
                   maxLength={11}
                   pattern="[0-9]{11}"
                   onBlur={() => {
-                    const raw = (form.number || '').replace(/\D/g, '');
-                    if (raw.length === 11) {
-                      const formatted = `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 11)}`;
-                      setForm((c) => ({ ...c, number: formatted }));
-                    }
+                    // Keep digits-only so backend regex /^09\d{9}$/ always matches.
+                    const raw = (form.number || '').replace(/\D/g, '').slice(0, 11);
+                    setForm((c) => ({ ...c, number: raw }));
                   }}
+
                   className="w-full rounded-2xl border border-gray-200 bg-white p-3 focus:border-silver-lake focus:outline-none focus:ring-4 focus:ring-silver-lake/15"
                 />
               </div>

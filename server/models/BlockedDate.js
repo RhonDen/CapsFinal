@@ -1,9 +1,14 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../utils/database');
 
-// Dates are normalized to midnight before saving so one calendar day maps to one record.
-const blockedDateSchema = new mongoose.Schema({
-  date: { type: Date, required: true, unique: true },
-  reason: { type: String, default: '' },
-});
+const BlockedDate = sequelize.define(
+  'BlockedDate',
+  {
+    id: { type: DataTypes.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
+    date: { type: DataTypes.DATE, allowNull: false, unique: true },
+    reason: { type: DataTypes.STRING, allowNull: true },
+  },
+  { tableName: 'BlockedDates' }
+);
 
-module.exports = mongoose.model('BlockedDate', blockedDateSchema);
+module.exports = BlockedDate;

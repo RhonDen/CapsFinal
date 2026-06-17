@@ -3,6 +3,7 @@ const { body, query, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const Appointment = require('../models/Appointment');
 const BlockedDate = require('../models/BlockedDate');
+const { Op } = require('sequelize');
 const ALLOWED_SERVICES = require('../constants/services');
 const sendSMS = require('../utils/sendSMS');
 const { getNextSerialNumber } = require('../utils/serialNumbers');
@@ -54,10 +55,20 @@ const buildDateSelector = (dateValue) => {
   }
 
   return {
-    $or: [
+    [Op.or]: [
       { dateKey },
-      { scheduledStart: { $gte: dayRange.start, $lt: dayRange.end } },
-      { date: { $gte: dayRange.start, $lt: dayRange.end } },
+      {
+        scheduledStart: {
+          [Op.gte]: dayRange.start,
+          [Op.lt]: dayRange.end,
+        },
+      },
+      {
+        date: {
+          [Op.gte]: dayRange.start,
+          [Op.lt]: dayRange.end,
+        },
+      },
     ],
   };
 };
@@ -70,22 +81,29 @@ const findBlockedDate = async (dateValue) => {
   }
 
   return BlockedDate.findOne({
-    date: { $gte: requestedRange.start, $lt: requestedRange.end },
+    where: {
+      date: {
+        [Op.gte]: requestedRange.start,
+        [Op.lt]: requestedRange.end,
+      },
+    },
   });
 };
 
 const findBlockingAppointments = async (dateKey, excludeAppointmentId = null) => {
-  const query = {
-    ...(buildDateSelector(dateKey) || { dateKey }),
-    status: { $in: ['accepted', 'completed', 'notCompleted'] },
-    time: { $ne: null },
+  const selector = buildDateSelector(dateKey) || { dateKey };
+
+  const where = {
+    ...selector,
+    status: { [Op.in]: ['accepted', 'completed', 'notCompleted'] },
+    time: { [Op.ne]: null },
   };
 
   if (excludeAppointmentId) {
-    query._id = { $ne: excludeAppointmentId };
+    where.id = { [Op.ne]: excludeAppointmentId };
   }
 
-  return Appointment.find(query).sort({ scheduledStart: 1, createdAt: 1 });
+  return Appointment.findAll({ where, order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']] });
 };
 
 const findConflictingAppointment = async (appointmentLike, excludeAppointmentId = null) => {
@@ -142,7 +160,27 @@ router.get(
 
     const existingAppointments = await findBlockingAppointments(schedule.dateKey);
     const candidateSlots = generateTimeSlots(service);
+
+    // If booking is for today, hide already-passed slots.
+    const now = new Date();
+    const isToday = schedule.dateKey === dateKeyFromDateValue(now);
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
     const availableSlots = candidateSlots.filter((slot) => {
+      if (isToday) {
+        const slotMinutes = (() => {
+          const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(slot);
+          if (!match) return null;
+          const h = Number(match[1]);
+          const m = Number(match[2]);
+          return h * 60 + m;
+        })();
+
+        if (slotMinutes !== null && slotMinutes < nowMinutes) {
+          return false;
+        }
+      }
+
       const slotWindow = getAppointmentWindow({
         dateKey: schedule.dateKey,
         time: slot,
@@ -229,7 +267,7 @@ router.post(
     const salt = await bcrypt.genSalt(10);
     const otpHash = await bcrypt.hash(otp, salt);
 
-    const appointment = new Appointment({
+    const appointment = await Appointment.create({
       serialNumber: await getNextSerialNumber('appointmentSerial'),
       number,
       lastName,
@@ -247,13 +285,11 @@ router.post(
       otpExpires: new Date(Date.now() + 5 * 60 * 1000),
     });
 
-    await appointment.save();
-
     try {
       await sendSMS(number, `Your AppointEase OTP is ${otp}. Valid for 5 minutes.`);
       return res.json({ message: 'OTP sent successfully.' });
     } catch {
-      await Appointment.findByIdAndDelete(appointment._id);
+      await Appointment.destroy({ where: { id: appointment.id } });
       return res.status(500).json({ error: 'Failed to send OTP.' });
     }
   })
@@ -276,11 +312,14 @@ router.post(
     const { number, otp } = req.body;
 
     const appointment = await Appointment.findOne({
-      number,
-      otp: { $ne: null },
-      otpExpires: { $gt: new Date() },
-      status: 'pending',
-    }).sort({ createdAt: -1 });
+      where: {
+        number,
+        otp: { [Op.ne]: null },
+        otpExpires: { [Op.gt]: new Date() },
+        status: 'pending',
+      },
+      order: [['createdAt', 'DESC']],
+    });
 
     if (!appointment) {
       return res.status(400).json({ error: 'No pending OTP or OTP expired.' });
@@ -308,7 +347,7 @@ router.post(
 
     return res.json({
       message: 'Appointment booked successfully.',
-      appointmentId: appointment._id,
+      appointmentId: appointment.id,
       serialNumber: appointment.serialNumber,
     });
   })
@@ -328,7 +367,7 @@ router.post(
     }
 
     const { number } = req.body;
-    const count = await Appointment.countDocuments({ number, otp: null });
+    const count = await Appointment.count({ where: { number, otp: null } });
 
     if (count === 0) {
       return res.status(404).json({ error: 'No appointments found for this number.' });
@@ -337,8 +376,9 @@ router.post(
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const salt = await bcrypt.genSalt(10);
     const otpHash = await bcrypt.hash(otp, salt);
-    const latestAppointment = await Appointment.findOne({ number, otp: null }).sort({
-      createdAt: -1,
+    const latestAppointment = await Appointment.findOne({
+      where: { number, otp: null },
+      order: [['createdAt', 'DESC']],
     });
 
     if (latestAppointment) {
@@ -373,10 +413,13 @@ router.post(
     const { number, otp } = req.body;
 
     const appointment = await Appointment.findOne({
-      number,
-      historyOtp: { $ne: null },
-      historyOtpExpires: { $gt: new Date() },
-    }).sort({ createdAt: -1 });
+      where: {
+        number,
+        historyOtp: { [Op.ne]: null },
+        historyOtpExpires: { [Op.gt]: new Date() },
+      },
+      order: [['createdAt', 'DESC']],
+    });
 
     if (!appointment) {
       return res.status(400).json({ error: 'No OTP requested or OTP expired.' });
@@ -392,16 +435,21 @@ router.post(
     appointment.historyOtpExpires = null;
     await appointment.save();
 
-    const appointments = await Appointment.find({ number, otp: null })
-      .select('-otp -otpExpires -historyOtp -historyOtpExpires')
-      .sort({ scheduledStart: -1, createdAt: -1 });
+    const appointments = await Appointment.findAll({
+      where: { number, otp: null },
+      order: [['scheduledStart', 'DESC'], ['createdAt', 'DESC']],
+      attributes: { exclude: ['otp', 'otpExpires', 'historyOtp', 'historyOtpExpires'] },
+    });
 
     return res.json({
-      appointments: appointments.map((entry) => ({
-        ...entry.toObject(),
-        dateKey: entry.dateKey || dateKeyFromDateValue(entry.date),
-        blocksTimeSlot: isBlockingStatus(entry.status),
-      })),
+      appointments: appointments.map((entry) => {
+        const data = entry.get({ plain: true });
+        return {
+          ...data,
+          dateKey: data.dateKey || dateKeyFromDateValue(data.date),
+          blocksTimeSlot: isBlockingStatus(data.status),
+        };
+      }),
     });
   })
 );

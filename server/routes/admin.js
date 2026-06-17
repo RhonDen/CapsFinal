@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const Appointment = require('../models/Appointment');
 const BlockedDate = require('../models/BlockedDate');
+const { Op } = require('sequelize');
 const ALLOWED_SERVICES = require('../constants/services');
 const auth = require('../middleware/auth');
 const sendSMS = require('../utils/sendSMS');
@@ -17,7 +18,20 @@ const {
   isBlockingStatus,
   normalizeDateOnly,
   windowsOverlap,
+  timeToMinutes,
 } = require('../utils/schedule');
+
+const pad2 = (v) => String(v).padStart(2, '0');
+const formatTimeLabel = (time) => {
+  if (!time) return 'No time';
+  const [hStr, mStr] = time.split(':');
+  const h = Number(hStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return time;
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const displayHours = h % 12 || 12;
+  return `${displayHours}:${pad2(m)} ${suffix}`;
+};
 
 const router = express.Router();
 
@@ -65,10 +79,20 @@ const buildDateSelector = (dateValue) => {
   }
 
   return {
-    $or: [
+    [Op.or]: [
       { dateKey },
-      { scheduledStart: { $gte: dayRange.start, $lt: dayRange.end } },
-      { date: { $gte: dayRange.start, $lt: dayRange.end } },
+      {
+        scheduledStart: {
+          [Op.gte]: dayRange.start,
+          [Op.lt]: dayRange.end,
+        },
+      },
+      {
+        date: {
+          [Op.gte]: dayRange.start,
+          [Op.lt]: dayRange.end,
+        },
+      },
     ],
   };
 };
@@ -80,23 +104,23 @@ const findBlockedDate = async (dateValue) => {
     return null;
   }
 
-  return BlockedDate.findOne({
-    date: { $gte: requestedRange.start, $lt: requestedRange.end },
-  });
+  return BlockedDate.findOne({ where: { date: { [Op.gte]: requestedRange.start, [Op.lt]: requestedRange.end } } });
 };
 
 const findBlockingAppointments = async (dateKey, excludeAppointmentId = null) => {
-  const query = {
-    ...(buildDateSelector(dateKey) || { dateKey }),
-    status: { $in: ['accepted', 'completed', 'notCompleted'] },
-    time: { $ne: null },
+  const selector = buildDateSelector(dateKey) || { dateKey };
+
+  const where = {
+    ...selector,
+    status: { [Op.in]: ['accepted', 'completed', 'notCompleted'] },
+    time: { [Op.ne]: null },
   };
 
   if (excludeAppointmentId) {
-    query._id = { $ne: excludeAppointmentId };
+    where.id = { [Op.ne]: excludeAppointmentId };
   }
 
-  return Appointment.find(query).sort({ scheduledStart: 1, createdAt: 1 });
+  return Appointment.findAll({ where, order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']] });
 };
 
 const findConflictingAppointment = async (appointmentLike, excludeAppointmentId = null) => {
@@ -123,7 +147,7 @@ const formatName = (appointment) =>
     .join(', ');
 
 const serializeAppointment = (appointment) => {
-  const data = appointment.toObject ? appointment.toObject() : appointment;
+  const data = appointment && appointment.get ? appointment.get({ plain: true }) : appointment;
   const appointmentWindow = getAppointmentWindow(data);
   const now = new Date();
   const hasSchedule = Boolean(appointmentWindow);
@@ -166,7 +190,7 @@ router.post(
     }
 
     const { username, password } = req.body;
-    const admin = await Admin.findOne({ username });
+    const admin = await Admin.findOne({ where: { username } });
 
     if (!admin) {
       return res.status(401).json({ error: 'Invalid credentials.' });
@@ -179,7 +203,7 @@ router.post(
     }
 
     const token = jwt.sign(
-      { id: admin._id, username: admin.username },
+      { id: admin.id, username: admin.username },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
     );
@@ -220,14 +244,8 @@ router.get(
     const todaySelector = buildDateSelector(todayDateKey);
 
     const [pendingAppointments, todayAppointments] = await Promise.all([
-      Appointment.find({
-        status: 'pending',
-        otp: null,
-      }).sort({ scheduledStart: 1, createdAt: 1 }),
-      Appointment.find({
-        ...(todaySelector || {}),
-        status: { $in: ['accepted', 'rejected', 'completed', 'notCompleted'] },
-      }).sort({ scheduledStart: 1, createdAt: 1 }),
+      Appointment.findAll({ where: { status: 'pending', otp: null }, order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']] }),
+      Appointment.findAll({ where: { ...(todaySelector || {}), status: { [Op.in]: ['accepted', 'rejected', 'completed', 'notCompleted'] } }, order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']] }),
     ]);
 
     const stats = {
@@ -276,7 +294,7 @@ router.patch(
       return;
     }
 
-    const appointment = await Appointment.findById(req.params.id);
+    const appointment = await Appointment.findByPk(req.params.id);
 
     if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found.' });
@@ -333,7 +351,7 @@ router.patch(
           scheduledStart: appointment.scheduledStart,
           scheduledEnd: appointment.scheduledEnd,
         },
-        appointment._id
+        appointment.id
       );
 
       if (conflictingAppointment) {
@@ -349,16 +367,19 @@ router.patch(
     if (status === 'accepted') {
       await sendStatusSms(
         appointment,
-        (entry) => `Your appointment on ${entry.dateKey} at ${entry.time} is approved.`
+        (entry) =>
+          `Your appointment on ${entry.dateKey} at ${formatTimeLabel(entry.time)} is approved.`
       );
     }
 
     if (status === 'rejected') {
       await sendStatusSms(
         appointment,
-        (entry) => `Your appointment on ${entry.dateKey} at ${entry.time} was rejected.`
+        (entry) =>
+          `Your appointment on ${entry.dateKey} at ${formatTimeLabel(entry.time)} was rejected.`
       );
     }
+
 
     if (status === 'completed') {
       await sendStatusSms(
@@ -385,13 +406,16 @@ router.get(
   '/blocked-dates',
   auth,
   asyncHandler(async (req, res) => {
-    const dates = await BlockedDate.find().sort({ date: 1 });
-    res.json(
-      dates.map((item) => ({
-        ...item.toObject(),
-        dateKey: dateKeyFromDateValue(item.date),
-      }))
-    );
+    const dates = await BlockedDate.findAll({ order: [['date', 'ASC']] });
+      res.json(
+        dates.map((item) => {
+          const data = item.get({ plain: true });
+          return {
+            ...data,
+            dateKey: dateKeyFromDateValue(data.date),
+          };
+        })
+      );
 
   })
 );
@@ -413,29 +437,24 @@ router.post(
       return res.status(400).json({ error: 'Invalid date.' });
     }
 
-    const existing = await BlockedDate.findOne({
-      date: { $gte: dayRange.start, $lt: dayRange.end },
-    });
+    const existing = await BlockedDate.findOne({ where: { date: { [Op.gte]: dayRange.start, [Op.lt]: dayRange.end } } });
 
     if (existing) {
       return res.status(400).json({ error: 'Date already blocked or invalid.' });
     }
 
-    const blocked = new BlockedDate({
-      date: normalizedDate,
-      reason: reason || '',
-    });
+    const blocked = await BlockedDate.create({ date: normalizedDate, reason: reason || '' });
 
-    await blocked.save();
+    const data = blocked.get ? blocked.get({ plain: true }) : blocked;
     return res.status(201).json({
-      ...blocked.toObject(),
-      dateKey: dateKeyFromDateValue(blocked.date),
+      ...data,
+      dateKey: dateKeyFromDateValue(data.date),
     });
   })
 );
 
 router.delete('/block-dates/:id', auth, asyncHandler(async (req, res) => {
-  await BlockedDate.findByIdAndDelete(req.params.id);
+  await BlockedDate.destroy({ where: { id: req.params.id } });
   res.json({ message: 'Removed.' });
 }));
 
@@ -443,29 +462,20 @@ router.get(
   '/clients',
   auth,
   asyncHandler(async (req, res) => {
-    const clients = await Appointment.aggregate([
-      {
-        $match: {
-          otp: null,
-        },
-      },
-      {
-        $addFields: {
-          appointmentDateTime: {
-            $ifNull: ['$scheduledStart', { $ifNull: ['$date', '$createdAt'] }],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: '$number',
-          lastAppointment: { $max: '$appointmentDateTime' },
-        },
-      },
-      { $project: { number: '$_id', lastAppointment: 1, _id: 0 } },
-      { $sort: { lastAppointment: -1 } },
-    ]);
+    // Build clients list by fetching appointments and reducing in JS
+    const rows = await Appointment.findAll({ where: { otp: null } });
+    const map = new Map();
+    rows.forEach((r) => {
+      const obj = r.get ? r.get({ plain: true }) : r;
+      const appointmentDateTime = obj.scheduledStart || obj.date || obj.createdAt;
+      const prev = map.get(obj.number);
+      if (!prev || appointmentDateTime > prev) {
+        map.set(obj.number, appointmentDateTime);
+      }
+    });
 
+    const clients = Array.from(map.entries()).map(([number, lastAppointment]) => ({ number, lastAppointment }));
+    clients.sort((a, b) => new Date(b.lastAppointment) - new Date(a.lastAppointment));
     res.json(clients);
   })
 );
@@ -640,43 +650,37 @@ router.get(
       },
     ];
 
-    const [pie, line, bar] = await Promise.all([
-      Appointment.aggregate([
-        ...basePipeline,
-        { $match: { status: 'completed' } },
-        { $group: { _id: '$service', count: { $sum: 1 } } },
-        { $sort: { count: -1, _id: 1 } },
-        { $project: { name: '$_id', value: '$count', _id: 0 } },
-      ]),
-      Appointment.aggregate([
-        ...basePipeline,
-        {
-          $group: {
-            _id: analysisType === 'daily' ? null : { $dayOfMonth: '$appointmentDateTime' },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { _id: 1 } },
-        analysisType === 'daily'
-          ? { $project: { day: 'Total', count: 1, _id: 0 } }
-          : { $project: { day: '$_id', count: 1, _id: 0 } },
-      ]),
-      Appointment.aggregate([
-        ...basePipeline,
-        { $group: { _id: '$status', count: { $sum: 1 } } },
-        { $project: { status: '$_id', count: 1, _id: 0 } },
-      ]),
-    ]);
-
-    res.json({
-      type: analysisType,
-      month: req.query.month ? Number.parseInt(req.query.month, 10) : undefined,
-      year: req.query.year ? Number.parseInt(req.query.year, 10) : undefined,
-      date: dateKey,
-      pie,
-      line,
-      bar,
+    // Fetch appointments in range and compute aggregates in JS
+    const rows = await Appointment.findAll({ where: { otp: null } });
+    const appointmentsInRange = rows.filter((r) => {
+      const obj = r.get ? r.get({ plain: true }) : r;
+      const appointmentDateTime = obj.scheduledStart || obj.date || obj.createdAt;
+      return appointmentDateTime >= start && appointmentDateTime < end;
     });
+
+    const pieMap = new Map();
+    const lineMap = new Map();
+    const barMap = new Map();
+
+    appointmentsInRange.forEach((r) => {
+      const obj = r.get ? r.get({ plain: true }) : r;
+      const appointmentDateTime = obj.scheduledStart || obj.date || obj.createdAt;
+      // pie (completed by service)
+      if (obj.status === 'completed') {
+        pieMap.set(obj.service, (pieMap.get(obj.service) || 0) + 1);
+      }
+      // line
+      const day = analysisType === 'daily' ? 'Total' : new Date(appointmentDateTime).getDate();
+      lineMap.set(day, (lineMap.get(day) || 0) + 1);
+      // bar
+      barMap.set(obj.status, (barMap.get(obj.status) || 0) + 1);
+    });
+
+    const pie = Array.from(pieMap.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+    const line = Array.from(lineMap.entries()).map(([day, count]) => ({ day, count })).sort((a, b) => (analysisType === 'daily' ? 0 : a.day - b.day));
+    const bar = Array.from(barMap.entries()).map(([status, count]) => ({ status, count }));
+
+    res.json({ type: analysisType, month: req.query.month ? Number.parseInt(req.query.month, 10) : undefined, year: req.query.year ? Number.parseInt(req.query.year, 10) : undefined, date: dateKey, pie, line, bar });
   })
 );
 
