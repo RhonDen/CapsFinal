@@ -410,18 +410,26 @@ function BookingForm() {
                 </div>
               </div>
 
-              {isDateBlocked ? (
-                <BlockedDateBanner
-                  reason={blockedReason}
-                  dateLabel={form.date}
-                />
-              ) : (
-                <div
-                  className="rounded-2xl border border-mist bg-pearl p-4 text-sm text-police"
-                >
-                  {slotMessage}
-                </div>
-              )}
+              <div>
+                {isDateBlocked ? (
+                  <BlockedDateBanner
+                    reason={blockedReason}
+                    dateLabel={form.date}
+                  />
+                ) : (
+                  <div
+                    className="rounded-2xl border border-mist bg-pearl p-4 text-sm text-police"
+                  >
+                    {slotMessage}
+                  </div>
+                )}
+
+                {/* Announcement shown below the booking form (or banner) */}
+                <p className="mt-3 text-xs text-silver-lake">
+                  If your selected date becomes blocked, the clinic may reject
+                  the request during admin review.
+                </p>
+              </div>
 
 
               <div>

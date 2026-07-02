@@ -32,7 +32,7 @@ function BlockDates() {
 
   const fetchDates = async () => {
     try {
-      const response = await axios.get('/api/admin/blocked-dates');
+        const response = await axios.get('/api/admin/blocked-dates', { withCredentials: true });
       setDates(response.data);
     } catch (requestError) {
       setError(requestError.response?.data?.error || 'Failed to load blocked dates.');
@@ -53,7 +53,7 @@ function BlockDates() {
     setError('');
 
     try {
-      await axios.post('/api/admin/block-dates', { date: newDate, reason });
+    await axios.post('/api/admin/block-dates', { date: newDate, reason }, { withCredentials: true });
       setReason('');
       await fetchDates();
     } catch (requestError) {
@@ -65,7 +65,7 @@ function BlockDates() {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`/api/admin/block-dates/${id}`);
+    await axios.delete(`/api/admin/block-dates/${id}`, { withCredentials: true });
       await fetchDates();
     } catch (requestError) {
       setError(requestError.response?.data?.error || 'Unable to remove blocked date.');

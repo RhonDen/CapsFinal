@@ -3,7 +3,12 @@ import { ArrowLeft, Mail, MessageSquare, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
 
+
+
+const getAuthHeaders = () => ({});
+
 const formatMessageMeta = (dateValue) => {
+
   const date = new Date(dateValue);
   const today = new Date();
   const isToday = date.toDateString() === today.toDateString();
@@ -18,14 +23,27 @@ const formatMessageMeta = (dateValue) => {
 function Inbox() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState('');
   const [activeMessageId, setActiveMessageId] = useState('');
+
+
+
+
+
+
+
+  const [query, setQuery] = useState('');
+
+
+
 
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const response = await axios.get('/api/contact/messages');
+        const response = await axios.get(`/api/contact/messages`, { withCredentials: true });
         setMessages(response.data.messages || []);
+
       } catch (requestError) {
         setError(requestError.response?.data?.error || 'Unable to load inbox.');
       } finally {
@@ -36,8 +54,14 @@ function Inbox() {
     fetchMessages();
   }, []);
 
+
   const sortedMessages = useMemo(
-    () => [...messages].sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt)),
+    () =>
+      [...messages].sort((left, right) => {
+        // Unread first
+        if (!!left.read !== !!right.read) return left.read ? 1 : -1;
+        return new Date(right.createdAt) - new Date(left.createdAt);
+      }),
     [messages]
   );
 
@@ -50,7 +74,8 @@ function Inbox() {
     if (!messageId) return;
 
     try {
-      await axios.patch(`/api/contact/messages/${messageId}/read`);
+      await axios.patch(`/api/contact/messages/${messageId}/read`, {}, { withCredentials: true });
+
       setMessages((current) =>
         current.map((message) =>
           message._id === messageId ? { ...message, read: true } : message
@@ -95,7 +120,12 @@ function Inbox() {
           </div>
           <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
             <Search className="h-4 w-4" />
-            Search
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search name/email/message"
+              className="w-60 bg-transparent text-sm outline-none placeholder:text-slate-400"
+            />
           </div>
         </div>
 
@@ -120,7 +150,14 @@ function Inbox() {
                 </div>
 
                 <div className="max-h-[480px] overflow-y-auto">
-                  {sortedMessages.map((message) => {
+                  {sortedMessages
+                  .filter((message) => {
+                    const q = query.trim().toLowerCase();
+                    if (!q) return true;
+                    const haystack = `${message.name || ''} ${message.email || ''} ${message.message || ''}`.toLowerCase();
+                    return haystack.includes(q);
+                  })
+                  .map((message) => {
                     const meta = formatMessageMeta(message.createdAt);
 
                     return (

@@ -1,7 +1,9 @@
 const jwt = require('jsonwebtoken');
+const { getJwtSecret } = require('../utils/jwtSecret');
 
 module.exports = (req, res, next) => {
   let token = req.cookies?.admin_token;
+
 
   // Keep a bearer-token fallback for tooling or backwards compatibility.
   if (!token) {
@@ -16,11 +18,15 @@ module.exports = (req, res, next) => {
     return res.status(401).json({ error: 'Access denied. No token provided.' });
   }
 
+  const jwtSecret = getJwtSecret();
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret);
+
     req.admin = decoded;
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token.' });
   }
+
 };

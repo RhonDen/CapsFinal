@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -14,6 +15,7 @@ app.disable('x-powered-by');
 
 // Add secure defaults for headers.
 app.use(helmet());
+
 
 // Only the configured frontend is allowed to use cookie-authenticated requests.
 app.use(
@@ -60,7 +62,28 @@ app.get('/api/health', (req, res) => {
 
 // Routes are registered after DB connects (see startServer)
 
+/**
+ * Serve React build (production only)
+ * During development (npm run dev / concurrently), the React app is served by Vite
+ * and calls the backend via the Vite proxy (/api -> http://localhost:5000).
+ * Keeping the SPA serving enabled in dev can cause stale UI / mismatched behavior.
+ */
+const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(clientDistPath));
+
+  // SPA fallback: serve index.html for all non-API routes
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
+      if (err) next();
+    });
+  });
+}
+
 app.use((error, req, res, next) => {
+
   void next;
   console.error('Unhandled server error:', error);
   res.status(500).json({ error: 'Internal server error.' });
@@ -80,10 +103,13 @@ const startServer = async () => {
     const bookingsRoute = require('./routes/bookings');
     const adminRoute = require('./routes/admin');
     const contactRoute = require('./routes/contact');
+    const publicBlockedDatesRoute = require('./routes/publicBlockedDates');
 
     app.use('/api/bookings', bookingsRoute);
     app.use('/api/contact', contactRoute);
     app.use('/api/admin', adminRoute);
+    app.use('/api/public', publicBlockedDatesRoute);
+
 
     console.log(
       database.mode === 'sqlite'
@@ -91,10 +117,23 @@ const startServer = async () => {
         : `Connected to MySQL at ${database.uri}`
     );
 
-    const port = process.env.PORT || 5000;
-    app.listen(port, () => {
+    const port = Number(process.env.PORT) || 5000;
+    const server = app.listen(port, () => {
+
       console.log(`Server running on port ${port}`);
+      console.log(`Serving React from: ${clientDistPath}`);
     });
+
+    // In dev, keep behavior predictable.
+    // If the port is already in use, fail fast so you don't end up with a "random" setup.
+    server.on('error', (err) => {
+      if (err && err.code === 'EADDRINUSE') {
+        console.error(`Port ${port} is already in use. Stop the previous dev server and restart.`);
+      }
+      throw err;
+    });
+
+
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);

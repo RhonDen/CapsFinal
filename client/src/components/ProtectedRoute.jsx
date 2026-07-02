@@ -10,7 +10,10 @@ function ProtectedRoute({ children }) {
 
     const verifyAdmin = async () => {
       try {
-        const response = await axios.get('/api/admin/check-auth');
+        const token = null;
+        const response = await axios.get('/api/admin/check-auth', {
+          withCredentials: true,
+        });
         if (isMounted) {
           setIsAuth(Boolean(response?.data?.authenticated));
         }

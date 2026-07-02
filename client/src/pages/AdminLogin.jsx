@@ -17,7 +17,7 @@ function AdminLogin() {
     setError('');
 
     try {
-      await axios.post('/api/admin/login', { username, password });
+      await axios.post('/api/admin/login', { username, password }, { withCredentials: true });
       navigate('/admin/dashboard');
     } catch (requestError) {
       if (!requestError.response) {

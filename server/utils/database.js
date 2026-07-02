@@ -50,38 +50,17 @@ async function connectDatabase() {
       uri: dialect === 'sqlite' ? sqliteStorage : `${username}@${host}:${port}/${database}`,
     };
   } catch (error) {
+    // Production safety: do not silently fall back from MySQL.
     if (dialect === 'mysql') {
       console.error('MySQL connection error:', error);
-      console.error('Falling back to SQLite for local development.');
-      const sqliteSequelize = new Sequelize({
-        dialect: 'sqlite',
-        storage: sqliteStorage,
-        logging: false,
-        define: {
-          timestamps: true,
-        },
-      });
-      sequelize = sqliteSequelize;
-
-      await sequelize.authenticate();
-      require('../models/Appointment');
-      require('../models/BlockedDate');
-      require('../models/Admin');
-      require('../models/ContactMessage');
-      require('../models/Counter');
-      await sequelize.sync();
-
-      module.exports.sequelize = sequelize;
-      return {
-        mode: 'sqlite',
-        uri: sqliteStorage,
-      };
+      throw error;
     }
 
     console.error('Database connection error:', error);
     throw error;
   }
 }
+
 
 async function disconnectDatabase() {
   if (sequelize) {

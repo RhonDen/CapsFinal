@@ -24,48 +24,73 @@ import teamMember1 from '../assets/team-member-1.svg';
 import teamMember2 from '../assets/team-member-2.svg';
 import teamMember3 from '../assets/team-member-3.svg';
 
+import jester from '../assets/jester.png';
+import rhon from '../assets/rhon.png';
+import rainiel from '../assets/rainiel.png';
+
 const team = [
   {
-    name: 'Alexandra Chen',
-    role: 'Lead Developer',
-    photo: teamMember1,
-    facebook: '#',
-    instagram: '#',
-    github: '#',
+    name: 'Rhon Denver Dulay',
+    role: 'Front end and Back end Developer',
+    photo: rhon,
+    facebook: 'https://www.facebook.com/share/1MjzDwpABn/',
+    instagram: 'https://www.instagram.com/rhden.xo?igsh=MTBid2tweGE0cDZ4YQ==',
+    github: 'https://github.com/RhonDen',
   },
   {
-    name: 'Marcus Rivera',
-    role: 'UX Designer',
-    photo: teamMember2,
-    facebook: '#',
-    instagram: '#',
-    github: '#',
+    name: 'Jester Parino',
+    role: 'UI and UX Designer',
+    photo: jester,
+    facebook: 'https://www.facebook.com/jester.parino.3',
+    instagram: 'https://www.instagram.com/jest_parino/',
+    github: 'https://github.com/Jesrino',
   },
   {
-    name: 'Priya Kapoor',
-    role: 'Data Analyst',
-    photo: teamMember3,
-    facebook: '#',
-    instagram: '#',
-    github: '#',
+    name: 'Rainiel Welch Mendoza',
+    role: 'Research And Database',
+    photo: rainiel,
+    facebook: 'https://www.facebook.com/Extraordina.rain.69',
+    instagram: '',
+    github: '',
   },
 ];
 
 import PublicDarkModeToggle from '../components/PublicDarkModeToggle.jsx';
 
 // Add Spline hero background as a lightweight visual layer.
-const SplineHero = () => (
-  <div
-    className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
-    aria-hidden="true"
-  >
-    <spline-viewer
-      url="https://prod.spline.design/9BNhFhTDvHT5pqDj/scene.splinecode"
-      className="absolute inset-0 h-full w-full"
-      style={{ transform: 'scale(1.08)' }}
-    />
-  </div>
-);
+const SplineHero = () => {
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (prefersReducedMotion) {
+    return (
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_60%_20%,rgba(142,199,234,0.25),transparent_40%)]" />
+      </div>
+    );
+  }
+
+  // Avoid runtime errors if the Spline web component isn't registered.
+  // The page will still look good without the hero animation.
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      aria-hidden="true"
+    >
+      <spline-viewer
+        url="https://prod.spline.design/9BNhFhTDvHT5pqDj/scene.splinecode"
+        className="absolute inset-0 h-full w-full"
+        style={{ transform: 'scale(1.08)' }}
+      />
+    </div>
+  );
+};
+
 
 function LandingPage() {
   const [contactForm, setContactForm] = useState({
@@ -78,6 +103,10 @@ function LandingPage() {
 
   const handleContactSubmit = async (event) => {
     event.preventDefault();
+
+    // Extra safety: if user double-clicks or submits again quickly,
+    // keep it from sending again.
+    if (submitting) return;
 
     if (!contactForm.name.trim() || !contactForm.email.trim()) {
       setContactStatus({
@@ -116,12 +145,20 @@ function LandingPage() {
     <div className="relative min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f7fbff_0%,#f9fcff_100%)] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <PublicDarkModeToggle />
 
-      <section className="relative isolate overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(142,199,234,0.45),_transparent_28%),linear-gradient(135deg,_#0C243D,_#16395b_48%,_#2d5d8a_100%)] px-6 py-24 text-white sm:px-8 lg:px-10 dark:text-slate-100">
+      <section className="relative isolate overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(142,199,234,0.45),_transparent_28%),linear-gradient(135deg,_#061A2C,_#0B2B45_45%,_#123C66_100%)] px-6 py-24 text-white sm:px-8 lg:px-10 dark:text-slate-100">
         <SplineHero />
 
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.18),transparent_24%)]" />
-        <div className="absolute -left-10 top-16 h-40 w-40 rounded-full bg-cyan-300/20 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-56 w-56 rounded-full bg-sky-400/20 blur-3xl" />
+        {/* Dark-blue layered atmosphere */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.16),transparent_25%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_90%,rgba(14,116,144,0.18),transparent_35%)]" />
+        <div className="absolute -left-10 top-16 h-44 w-44 rounded-full bg-cyan-300/15 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-sky-400/10 blur-3xl" />
+
+        {/* Subtle grid overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.14] [background-image:linear-gradient(to_right,rgba(255,255,255,0.25)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.25)_1px,transparent_1px)] [background-size:48px_48px]"
+          aria-hidden="true"
+        />
 
         <div className="relative mx-auto max-w-6xl">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium backdrop-blur">
@@ -292,8 +329,9 @@ function LandingPage() {
                     href={member.facebook}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-police transition hover:text-silver-lake dark:text-slate-200 dark:hover:text-cyan-200"
-                    aria-label={`${member.name} Facebook`}
+                    className="text-police transition hover:text-silver-lake dark:text-slate-200 dark:hover:text-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-950"
+                    aria-label={`${member.name} Facebook link`}
+                    title="Facebook"
                   >
                     <Facebook className="h-5 w-5" />
                   </a>

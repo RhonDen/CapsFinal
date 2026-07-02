@@ -9,6 +9,8 @@ const { Op } = require('sequelize');
 const ALLOWED_SERVICES = require('../constants/services');
 const auth = require('../middleware/auth');
 const sendSMS = require('../utils/sendSMS');
+const { getJwtSecret } = require('../utils/jwtSecret');
+
 const { getNextSerialNumber } = require('../utils/serialNumbers');
 const {
   buildSchedule,
@@ -63,6 +65,7 @@ const getDayRange = (dateValue) => {
   if (!start) {
     return null;
   }
+
 
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
@@ -202,22 +205,34 @@ router.post(
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
+    const jwtSecret = getJwtSecret();
+
+
+
     const token = jwt.sign(
       { id: admin.id, username: admin.username },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
+      jwtSecret,
+      // Long-lived session: 365 days. (Admin cookies will keep the admin accessible 24/7.)
+      { expiresIn: process.env.JWT_EXPIRES_IN || '365d' }
     );
+
+
+
+    const isProd = process.env.NODE_ENV === 'production';
 
     res.cookie('admin_token', token, {
       httpOnly: true,
-      // Ensure cookie is accepted in dev HTTP. (secure cookies are ignored on HTTP.)
-      secure: false,
-      sameSite: 'lax',
-
-      maxAge: 60 * 60 * 1000,
+      path: '/',
+      // In dev (HTTP/localhost) use a lax cookie.
+      // In production (HTTPS) use SameSite=None + Secure.
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      maxAge: 365 * 24 * 60 * 60 * 1000,
     });
 
-    return res.json({ message: 'Login successful.' });
+
+
+    return res.json({ message: 'Login successful.', token });
   })
 );
 
@@ -240,12 +255,34 @@ router.get(
   '/dashboard',
   auth,
   asyncHandler(async (req, res) => {
+    const now = new Date();
     const todayDateKey = getTodayDateKey();
+
     const todaySelector = buildDateSelector(todayDateKey);
 
-    const [pendingAppointments, todayAppointments] = await Promise.all([
-      Appointment.findAll({ where: { status: 'pending', otp: null }, order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']] }),
-      Appointment.findAll({ where: { ...(todaySelector || {}), status: { [Op.in]: ['accepted', 'rejected', 'completed', 'notCompleted'] } }, order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']] }),
+    const [pendingAppointments, todayAppointments, upcomingAppointments] = await Promise.all([
+      Appointment.findAll(
+        { where: { status: 'pending', otp: null }, order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']] }
+      ),
+      Appointment.findAll({
+        where: {
+          ...(todaySelector || {}),
+          status: { [Op.in]: ['accepted', 'rejected', 'completed', 'notCompleted'] },
+          time: { [Op.ne]: null },
+        },
+        order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']],
+      }),
+      // Upcoming: next closest scheduled appointments (approved-only), starting from now.
+      Appointment.findAll({
+        where: {
+          status: { [Op.in]: ['accepted', 'rejected', 'completed', 'notCompleted'] },
+          time: { [Op.ne]: null },
+          scheduledStart: { [Op.gte]: now },
+          otp: null,
+        },
+        order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']],
+        limit: 12,
+      }),
     ]);
 
     const stats = {
@@ -276,15 +313,104 @@ router.get(
       stats,
       pendingAppointments: pendingAppointments.map(serializeAppointment),
       todayAppointments: todayAppointments.map(serializeAppointment),
+      upcomingAppointments: upcomingAppointments.map(serializeAppointment),
     });
   })
 );
 
-router.patch(
-  '/appointments/:id/status',
+router.get(
+  '/history',
   auth,
   [
-    param('id').isMongoId().withMessage('Invalid appointment ID.'),
+    query('from').optional().isISO8601().withMessage('Invalid from date.'),
+    query('to').optional().isISO8601().withMessage('Invalid to date.'),
+    query('status').optional().isIn(['pending', 'accepted', 'rejected', 'completed', 'notCompleted']).withMessage('Invalid status.'),
+    query('phone').optional().isString().withMessage('Invalid phone.'),
+  ],
+  asyncHandler(async (req, res) => {
+    if (!validate(req, res)) {
+      return;
+    }
+
+    const { from, to, status, phone } = req.query;
+
+    const digitsOnlyPhone = phone ? String(phone).replace(/\D/g, '').trim() : '';
+    const phoneToMatch = digitsOnlyPhone ? digitsOnlyPhone.slice(0, 11) : '';
+
+    // Normalize date range:
+    // - 'to' is treated as inclusive day, so we use endExclusive = startOfNextDay.
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
+
+    const dateKeyFrom = fromDate ? dateKeyFromDateValue(fromDate) : null;
+    const dateKeyTo = toDate ? dateKeyFromDateValue(toDate) : null;
+
+    // If dateKeyFrom/dateKeyTo fail, fall back to scheduledStart/date filtering in a safe way.
+    // Primary filtering uses dateKey (YYYY-MM-DD lexical range works).
+    const where = {
+      otp: null,
+    };
+
+    // History should only include "outcomes" by default:
+    // - completed
+    // - notCompleted
+    // If the admin explicitly selects a status filter, respect it.
+    if (status) {
+      where.status = status;
+    } else {
+      where.status = { [Op.in]: ['completed', 'notCompleted'] };
+    }
+
+    if (phoneToMatch) {
+      // Exact match on the stored number (after client strips non-digits).
+      where.number = phoneToMatch;
+    }
+
+    if (dateKeyFrom && dateKeyTo) {
+      where.dateKey = {
+        [Op.gte]: dateKeyFrom,
+        [Op.lte]: dateKeyTo,
+      };
+    } else if (fromDate || toDate) {
+      const start = fromDate ? new Date(fromDate) : new Date('1970-01-01T00:00:00.000Z');
+      const endExclusive = toDate ? new Date(toDate) : new Date('2999-12-31T00:00:00.000Z');
+
+      // Make endExclusive inclusive of the whole day.
+      endExclusive.setDate(endExclusive.getDate() + 1);
+
+      where[Op.and] = [
+        {
+          [Op.or]: [
+            { scheduledStart: { [Op.gte]: start, [Op.lt]: endExclusive } },
+            { date: { [Op.gte]: start, [Op.lt]: endExclusive } },
+          ],
+        },
+      ];
+    }
+
+    const appointments = await Appointment.findAll({
+      where,
+      order: [['scheduledStart', 'DESC'], ['createdAt', 'DESC']],
+    });
+
+    res.json({
+      appointments: appointments.map(serializeAppointment),
+    });
+  })
+);
+
+
+
+router.patch(
+    '/appointments/:id/status',
+  auth,
+  [
+    // Appointment primary key is a BIGINT (numeric) in this project.
+    // Accept numeric ids (stringified numbers from the client) instead of MongoId.
+    param('id')
+      .isString()
+      .matches(/^\d+$/)
+      .withMessage('Invalid appointment ID.'),
     body('status')
       .isIn(['accepted', 'rejected', 'completed', 'notCompleted'])
       .withMessage('Invalid appointment status.'),
@@ -406,19 +532,31 @@ router.get(
   '/blocked-dates',
   auth,
   asyncHandler(async (req, res) => {
-    const dates = await BlockedDate.findAll({ order: [['date', 'ASC']] });
-      res.json(
-        dates.map((item) => {
-          const data = item.get({ plain: true });
-          return {
-            ...data,
-            dateKey: dateKeyFromDateValue(data.date),
-          };
-        })
-      );
+    // Auto-delete blocked dates that are already past (keeps admin list clean)
+    const now = new Date();
+    const today = normalizeDateOnly(now);
 
+    await BlockedDate.destroy({
+      where: {
+        date: {
+          [Op.lt]: today,
+        },
+      },
+    });
+
+    const dates = await BlockedDate.findAll({ order: [['date', 'ASC']] });
+    res.json(
+      dates.map((item) => {
+        const data = item.get({ plain: true });
+        return {
+          ...data,
+          dateKey: dateKeyFromDateValue(data.date),
+        };
+      })
+    );
   })
 );
+
 
 router.post(
   '/block-dates',
@@ -465,16 +603,32 @@ router.get(
     // Build clients list by fetching appointments and reducing in JS
     const rows = await Appointment.findAll({ where: { otp: null } });
     const map = new Map();
+
     rows.forEach((r) => {
       const obj = r.get ? r.get({ plain: true }) : r;
       const appointmentDateTime = obj.scheduledStart || obj.date || obj.createdAt;
+
       const prev = map.get(obj.number);
-      if (!prev || appointmentDateTime > prev) {
-        map.set(obj.number, appointmentDateTime);
+      if (!prev || appointmentDateTime > prev.lastAppointment) {
+        map.set(obj.number, {
+          number: obj.number,
+          lastAppointment: appointmentDateTime,
+          firstName: obj.firstName,
+          lastName: obj.lastName,
+          middleInitial: obj.middleInitial,
+        });
       }
     });
 
-    const clients = Array.from(map.entries()).map(([number, lastAppointment]) => ({ number, lastAppointment }));
+    const clients = Array.from(map.values()).map((c) => ({
+      number: c.number,
+      lastAppointment: c.lastAppointment,
+      firstName: c.firstName || '',
+      lastName: c.lastName || '',
+      middleInitial: c.middleInitial || '',
+      fullName: [c.lastName, c.firstName, c.middleInitial].filter(Boolean).join(', '),
+    }));
+
     clients.sort((a, b) => new Date(b.lastAppointment) - new Date(a.lastAppointment));
     res.json(clients);
   })

@@ -208,8 +208,8 @@ router.post(
   [
     body('number')
       .trim()
-      .matches(/^09\d{9}$/)
-      .withMessage('Invalid phone number'),
+      .matches(/^(09\d{9}|\+63\d{10}|63\d{10})$/)
+      .withMessage('Invalid phone number. Use 09XXXXXXXXX, +639XXXXXXXXX, or 63XXXXXXXXXX.'),
     body('lastName').trim().notEmpty().withMessage('Last name is required.'),
     body('firstName').trim().notEmpty().withMessage('First name is required.'),
     body('middleInitial')
@@ -288,10 +288,40 @@ router.post(
     try {
       await sendSMS(number, `Your AppointEase OTP is ${otp}. Valid for 5 minutes.`);
       return res.json({ message: 'OTP sent successfully.' });
-    } catch {
-      await Appointment.destroy({ where: { id: appointment.id } });
-      return res.status(500).json({ error: 'Failed to send OTP.' });
+    } catch (e) {
+      console.error('OTP sendSMS error:', {
+        message: e?.message,
+        provider: e?.provider,
+        status: e?.status,
+        recipientHint: number,
+      });
+
+      // Do NOT destroy the appointment here.
+      // Keeping it lets you retry/debug without losing the OTP record.
+      let normalizedRecipient;
+      try {
+        normalizedRecipient = sendSMS.toE164PhStrict(number);
+      } catch (_) {
+        normalizedRecipient = undefined;
+      }
+
+      return res.status(500).json({
+        error: 'Failed to send OTP.',
+        details: e?.provider || e?.message || 'Unknown error',
+        debug: {
+          message: e?.message,
+          provider: e?.provider,
+          status: e?.status,
+          recipientHint: number,
+          normalizedRecipient,
+          // If sendSMS throws with payload info, include it for immediate diagnosis.
+          payload: e?.payload,
+          sender_id: e?.sender_id,
+        },
+      });
     }
+
+
   })
 );
 
@@ -358,8 +388,8 @@ router.post(
   [
     body('number')
       .trim()
-      .matches(/^09\d{9}$/)
-      .withMessage('Invalid phone number'),
+      .matches(/^(09\d{9}|\+63\d{10}|63\d{10})$/)
+      .withMessage('Invalid phone number. Use 09XXXXXXXXX, +639XXXXXXXXX, or 63XXXXXXXXXX.'),
   ],
   asyncHandler(async (req, res) => {
     if (!validate(req, res)) {

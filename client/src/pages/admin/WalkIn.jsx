@@ -45,7 +45,7 @@ function WalkIn() {
       setSlotMessage('');
 
       try {
-        const response = await axios.get('/api/bookings/availability', {
+      const response = await axios.get('/api/bookings/availability', {
           params: {
             date: form.date,
             service: form.service,
