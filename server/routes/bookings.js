@@ -241,6 +241,16 @@ router.post(
     const { number, lastName, firstName, middleInitial, service, email, date, time } =
       req.body;
 
+    // Store and match phone numbers in a consistent provider-friendly format.
+    // This prevents verify step failures when frontend sends a different phone formatting.
+    const normalizedRequestNumber = (() => {
+      try {
+        return sendSMS.toE164PhStrict(number);
+      } catch (_) {
+        return number;
+      }
+    })();
+
     const schedule = buildSchedule({ dateValue: date, time, service });
 
     if (!schedule) {
@@ -269,7 +279,7 @@ router.post(
 
     const appointment = await Appointment.create({
       serialNumber: await getNextSerialNumber('appointmentSerial'),
-      number,
+      number: normalizedRequestNumber,
       lastName,
       firstName,
       middleInitial: middleInitial || '',
@@ -286,7 +296,7 @@ router.post(
     });
 
     try {
-      await sendSMS(number, `Your AppointEase OTP is ${otp}. Valid for 5 minutes.`);
+      await sendSMS(normalizedRequestNumber, `Your Dents-City OTP is ${otp}. Valid for 5 minutes.`);
       return res.json({ message: 'OTP sent successfully.' });
     } catch (e) {
       console.error('OTP sendSMS error:', {
@@ -341,9 +351,29 @@ router.post(
 
     const { number, otp } = req.body;
 
+    // Always normalize to the provider-friendly strict E.164 format
+    // (and also handle common frontend formats like 09XXXXXXXXX or 9XXXXXXXXX).
+    let normalizedNumber;
+    try {
+      normalizedNumber = sendSMS.toE164PhStrict(number);
+    } catch {
+      const digits = String(number || '').replace(/\D/g, '');
+
+      // 09XXXXXXXXX -> +63XXXXXXXXX
+      if (/^09\d{9}$/.test(digits)) {
+        normalizedNumber = sendSMS.toE164PhStrict(digits);
+      }
+      // 9XXXXXXXXX -> 09XXXXXXXXX -> +63XXXXXXXXX
+      else if (/^9\d{9}$/.test(digits)) {
+        normalizedNumber = sendSMS.toE164PhStrict(`09${digits.slice(1)}`);
+      } else {
+        normalizedNumber = digits;
+      }
+    }
+
     const appointment = await Appointment.findOne({
       where: {
-        number,
+        number: normalizedNumber,
         otp: { [Op.ne]: null },
         otpExpires: { [Op.gt]: new Date() },
         status: 'pending',
@@ -418,7 +448,7 @@ router.post(
     }
 
     try {
-      await sendSMS(number, `Your AppointEase history OTP is ${otp}. Valid for 5 minutes.`);
+      await sendSMS(number, `Your Dents-City history OTP is ${otp}. Valid for 5 minutes.`);
       return res.json({ message: 'OTP sent to your phone.' });
     } catch {
       return res.status(500).json({ error: 'Failed to send OTP.' });

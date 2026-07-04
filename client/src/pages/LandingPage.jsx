@@ -20,9 +20,6 @@ import AboutClinicSection from '../components/AboutClinicSection.jsx';
 import SectionHeading from '../components/SectionHeading.jsx';
 import { FEATURED_SERVICES } from '../constants/services.js';
 import { formatServiceLabel } from '../utils/schedule.js';
-import teamMember1 from '../assets/team-member-1.svg';
-import teamMember2 from '../assets/team-member-2.svg';
-import teamMember3 from '../assets/team-member-3.svg';
 
 import jester from '../assets/jester.png';
 import rhon from '../assets/rhon.png';

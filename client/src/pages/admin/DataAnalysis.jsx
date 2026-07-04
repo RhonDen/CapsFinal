@@ -17,14 +17,21 @@ import {
   YAxis,
 } from 'recharts';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
-import { formatServiceLabel, formatStatusLabel, getLocalDateKey } from '../../utils/schedule.js';
+import {
+  formatServiceLabel,
+  formatStatusLabel,
+  getLocalDateKey,
+} from '../../utils/schedule.js';
 
 const COLORS = ['#0C243D', '#27496A', '#5C8EB4', '#9AB7CD', '#C1D1DB'];
+
 const ANALYSIS_TYPES = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
+  { value: 'predictive', label: 'Predictive (Next Month)' },
 ];
+
 const MONTH_OPTIONS = [
   { value: 1, label: 'January' },
   { value: 2, label: 'February' },
@@ -43,11 +50,19 @@ const MONTH_OPTIONS = [
 function DataAnalysis() {
   const now = new Date();
   const today = getLocalDateKey();
+
   const [analysisType, setAnalysisType] = useState('monthly');
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [data, setData] = useState({ pie: [], line: [], bar: [] });
+
+  const [data, setData] = useState({
+    pie: [],
+    line: [],
+    bar: [],
+    peakHours: [],
+    predictivePie: [],
+  });
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -58,27 +73,51 @@ function DataAnalysis() {
     const fetchAnalytics = async () => {
       try {
         let params = {};
-        
+
         if (analysisType === 'daily') {
           params = { type: 'daily', date: selectedDate };
         } else if (analysisType === 'weekly') {
           params = { type: 'weekly', date: selectedDate };
+        } else if (analysisType === 'predictive') {
+          params = { type: 'predictive', month: selectedMonth, year: selectedYear };
         } else {
           params = { type: 'monthly', month: selectedMonth, year: selectedYear };
         }
 
         const response = await axios.get('/api/admin/analytics', { params });
 
+        const normalizePie = (arr) => {
+          const safe = Array.isArray(arr) ? arr : [];
+          return safe
+            .map((item) => {
+              const rawName = item?.name ?? item?.service ?? item?.label ?? item?.id ?? '';
+              const rawValue =
+                item?.value ??
+                item?.count ??
+                item?.appointments ??
+                item?.total ??
+                item?.y ??
+                0;
+
+              const valueNum = Number(rawValue);
+              return {
+                ...item,
+                name: formatServiceLabel(String(rawName)),
+                value: Number.isFinite(valueNum) ? valueNum : 0,
+              };
+            })
+            .filter((x) => x.name);
+        };
+
         setData({
-          pie: (response.data.pie || []).map((item) => ({
-            ...item,
-            name: formatServiceLabel(item.name),
-          })),
+          pie: normalizePie(response.data.pie),
+          predictivePie: normalizePie(response.data.predictivePie || response.data.pie),
           line: response.data.line || [],
           bar: (response.data.bar || []).map((item) => ({
             ...item,
             statusLabel: formatStatusLabel(item.status),
           })),
+          peakHours: Array.isArray(response.data.peakHours) ? response.data.peakHours : [],
         });
       } catch (error) {
         console.error('Analytics fetch error:', error);
@@ -88,100 +127,103 @@ function DataAnalysis() {
     fetchAnalytics();
   }, [analysisType, selectedDate, selectedMonth, selectedYear]);
 
+  const title = useMemo(() => {
+    if (analysisType === 'daily') return 'Daily Analysis';
+    if (analysisType === 'weekly') return 'Weekly Analysis';
+    if (analysisType === 'predictive') return 'Predictive (Next Month) Analysis';
+    return 'Monthly Analysis';
+  }, [analysisType]);
+
+  const description = useMemo(() => {
+    if (analysisType === 'daily') {
+      return `Analysis for ${selectedDate}: completed services, total appointments, and status distribution.`;
+    }
+    if (analysisType === 'weekly') {
+      return `Analysis for the week starting ${selectedDate}: daily breakdown of appointments and status distribution.`;
+    }
+    if (analysisType === 'predictive') {
+      const monthLabel = MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label || 'Selected Month';
+      return `Forecast for the next month based on ${monthLabel} ${selectedYear} and recent demand.`;
+    }
+    const monthLabel = MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label || 'Selected Month';
+    return `Analysis for ${monthLabel} ${selectedYear}: daily breakdown of completed services and status distribution.`;
+  }, [analysisType, selectedDate, selectedMonth, selectedYear]);
+
   return (
-    <AdminPageShell
-      title={`${analysisType === 'daily' ? 'Daily' : analysisType === 'weekly' ? 'Weekly' : 'Monthly'} Analysis`}
-      description={
-        analysisType === 'daily'
-          ? `Analysis for ${selectedDate}: completed services, total appointments, and status distribution.`
-          : analysisType === 'weekly'
-          ? `Analysis for the week starting ${selectedDate}: daily breakdown of appointments and status distribution.`
-          : `Analysis for ${MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label} ${selectedYear}: daily breakdown of completed services and status distribution.`
-      }
-      icon={BarChart3}
-    >
-      <div className="mb-6 flex flex-wrap gap-3 rounded-[24px] bg-white p-5 shadow-sm dark:bg-slate-800">
-        <div className="flex flex-wrap gap-3">
-          {ANALYSIS_TYPES.map((type) => (
-            <button
-              key={type.value}
-              onClick={() => setAnalysisType(type.value)}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                analysisType === type.value
-                  ? 'bg-maastricht text-white dark:bg-slate-600'
-                  : 'bg-pearl text-maastricht dark:bg-slate-700 dark:text-slate-200 hover:dark:bg-slate-600'
-              }`}
-            >
-              {type.label}
-            </button>
-          ))}
+    <AdminPageShell title={title} description={description} icon={BarChart3}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <label className="text-sm font-medium text-maastricht dark:text-slate-200">Analysis Type</label>
+          <select
+            value={analysisType}
+            onChange={(event) => setAnalysisType(event.target.value)}
+            className="rounded-xl border bg-white px-4 py-2 text-sm text-maastricht dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+          >
+            {ANALYSIS_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+
+          {(analysisType === 'daily' || analysisType === 'weekly') && (
+            <>
+              <label className="text-sm font-medium text-maastricht dark:text-slate-200">Date</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
+                className="rounded-xl border bg-white px-4 py-2 text-sm text-maastricht dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              />
+            </>
+          )}
+
+          {(analysisType === 'monthly' || analysisType === 'predictive') && (
+            <>
+              <select
+                value={selectedMonth}
+                onChange={(event) => setSelectedMonth(Number(event.target.value))}
+                className="rounded-xl border bg-white px-4 py-3 text-sm text-maastricht dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              >
+                {MONTH_OPTIONS.map((month) => (
+                  <option key={month.value} value={month.value}>
+                    {month.label}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedYear}
+                onChange={(event) => setSelectedYear(Number(event.target.value))}
+                className="rounded-xl border bg-white px-4 py-3 text-sm text-maastricht dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              >
+                {yearOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
-
-        {analysisType === 'daily' && (
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
-            max={today}
-            className="rounded-xl border bg-white px-4 py-2 text-sm text-maastricht dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-          />
-        )}
-
-        {analysisType === 'weekly' && (
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
-            max={today}
-            className="rounded-xl border bg-white px-4 py-2 text-sm text-maastricht dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-          />
-        )}
-
-        {analysisType === 'monthly' && (
-          <>
-            <select
-              value={selectedMonth}
-              onChange={(event) => setSelectedMonth(Number(event.target.value))}
-              className="rounded-xl border bg-white px-4 py-3 text-sm text-maastricht dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-            >
-              {MONTH_OPTIONS.map((month) => (
-                <option key={month.value} value={month.value}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={selectedYear}
-              onChange={(event) => setSelectedYear(Number(event.target.value))}
-              className="rounded-xl border bg-white px-4 py-3 text-sm text-maastricht dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-            >
-              {yearOptions.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-
-        {/* If the API fails or returns no data, render something visible instead of blank charts. */}
-        {data && data.pie && data.pie.length === 0 && data.line && data.line.length === 0 && data.bar && data.bar.length === 0 ? (
-          <div className="col-span-2 mt-3 rounded-xl border border-dashed border-mist bg-pearl p-4 text-sm text-police">
-            No analytics data found for the selected range.
-          </div>
-        ) : null}
-
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mt-6">
         <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
-          <h2 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">Most Completed Services</h2>
+          <h2 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">
+            {analysisType === 'predictive'
+              ? 'Predicted Most Appointments Service (Next Month)'
+              : 'Most Completed Services'}
+          </h2>
+
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
+                <PieChart>
+                  {/* keep stable rendering */}
+                </PieChart>
                 <Pie
-                  data={data.pie}
+                  data={analysisType === 'predictive' ? data.predictivePie : data.pie}
                   dataKey="value"
                   nameKey="name"
                   cx="50%"
@@ -189,7 +231,7 @@ function DataAnalysis() {
                   outerRadius={88}
                   label
                 >
-                  {data.pie.map((entry, index) => (
+                  {(analysisType === 'predictive' ? data.predictivePie : data.pie).map((entry, index) => (
                     <Cell key={`${entry.name}-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -201,10 +243,34 @@ function DataAnalysis() {
         </div>
 
         <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
-          <h2 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">Appointments by Day</h2>
+          <h2 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">
+            Peak Hours
+          </h2>
+
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.line}>
+              <LineChart
+                data={(data.peakHours || []).map((x) => ({
+                  hour: `${x.hour}:00`,
+                  count: x.count,
+                }))}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="hour" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" stroke="#27496A" strokeWidth={2.5} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+          <h2 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">Appointments by Day</h2>
+
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.line || []}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis allowDecimals={false} />
@@ -217,9 +283,10 @@ function DataAnalysis() {
 
         <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800 lg:col-span-2">
           <h2 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">Status Distribution</h2>
+
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.bar}>
+              <BarChart data={data.bar || []}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="statusLabel" />
                 <YAxis allowDecimals={false} />

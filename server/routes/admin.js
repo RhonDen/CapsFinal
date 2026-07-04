@@ -20,7 +20,6 @@ const {
   isBlockingStatus,
   normalizeDateOnly,
   windowsOverlap,
-  timeToMinutes,
 } = require('../utils/schedule');
 
 const pad2 = (v) => String(v).padStart(2, '0');
@@ -490,35 +489,23 @@ router.patch(
     appointment.status = status;
     await appointment.save();
 
-    if (status === 'accepted') {
-      await sendStatusSms(
-        appointment,
-        (entry) =>
-          `Your appointment on ${entry.dateKey} at ${formatTimeLabel(entry.time)} is approved.`
-      );
-    }
+    const statusSmsBuilders = {
+      accepted: (entry) => {
+        const name = formatName(entry);
+        return `Knorkubs, Liuh F Your booking has been approved for Dents-City. Date: ${entry.dateKey}, Time: ${formatTimeLabel(
+          entry.time
+        )}. Thank you.`;
+      },
+      rejected: (entry) =>
+        `Your appointment on ${entry.dateKey} at ${formatTimeLabel(entry.time)} was rejected.`,
+      completed: () => 'Your appointment has been marked as completed. Thank you.',
+      notCompleted: () =>
+        'Your appointment has been marked as not completed. Please contact the clinic if needed.',
+    };
 
-    if (status === 'rejected') {
-      await sendStatusSms(
-        appointment,
-        (entry) =>
-          `Your appointment on ${entry.dateKey} at ${formatTimeLabel(entry.time)} was rejected.`
-      );
-    }
-
-
-    if (status === 'completed') {
-      await sendStatusSms(
-        appointment,
-        () => 'Your appointment has been marked as completed. Thank you.'
-      );
-    }
-
-    if (status === 'notCompleted') {
-      await sendStatusSms(
-        appointment,
-        () => 'Your appointment has been marked as not completed. Please contact the clinic if needed.'
-      );
+    const builder = statusSmsBuilders[status];
+    if (builder) {
+      await sendStatusSms(appointment, builder);
     }
 
     res.json({
@@ -729,8 +716,8 @@ router.get(
   [
     query('type')
       .optional()
-      .isIn(['daily', 'weekly', 'monthly'])
-      .withMessage('Analysis type must be daily, weekly, or monthly.'),
+      .isIn(['daily', 'weekly', 'monthly', 'predictive'])
+      .withMessage('Analysis type must be daily, weekly, monthly, or predictive.'),
     query('month')
       .optional()
       .isInt({ min: 1, max: 12 })
@@ -751,90 +738,199 @@ router.get(
 
     const now = new Date();
     const analysisType = req.query.type || 'monthly';
-    let start, end, dateKey;
 
-    if (analysisType === 'daily') {
-      dateKey = req.query.date || dateKeyFromDateValue(now);
-      const dayRange = getDayRange(dateKey);
-      if (!dayRange) {
-        return res.status(400).json({ error: 'Invalid date.' });
-      }
-      start = dayRange.start;
-      end = dayRange.end;
-    } else if (analysisType === 'weekly') {
-      dateKey = req.query.date || dateKeyFromDateValue(now);
-      const [year, month, day] = dateKey.split('-').map(Number);
-      const date = new Date(year, month - 1, day);
-      const dayOfWeek = date.getDay();
-      const firstDay = new Date(date);
-      firstDay.setDate(date.getDate() - dayOfWeek);
-      firstDay.setHours(0, 0, 0, 0);
-      const lastDay = new Date(firstDay);
-      lastDay.setDate(firstDay.getDate() + 6);
-      lastDay.setHours(23, 59, 59, 999);
-      start = firstDay;
-      end = new Date(lastDay);
-      end.setDate(end.getDate() + 1);
-      end.setHours(0, 0, 0, 0);
-    } else {
-      // Monthly (default)
+    const toAppointmentDate = (obj) => {
+      const raw = obj?.scheduledStart || obj?.date || obj?.createdAt;
+      const d = raw ? new Date(raw) : null;
+      return d && !Number.isNaN(d.getTime()) ? d : null;
+    };
+
+    const getPredictiveTargetMonth = () => {
       const year = req.query.year ? Number.parseInt(req.query.year, 10) : now.getFullYear();
-      const month = req.query.month ? Number.parseInt(req.query.month, 10) : now.getMonth() + 1;
-      start = new Date(year, month - 1, 1, 0, 0, 0, 0);
-      end = new Date(year, month, 1, 0, 0, 0, 0);
+      const monthBase = req.query.month ? Number.parseInt(req.query.month, 10) : now.getMonth() + 1; // selected month
+      const next = monthBase + 1; // next month
+      let y = year;
+      let m = next;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
+      return { year: y, month: m };
+    };
+
+    const computeRange = () => {
+      if (analysisType === 'daily') {
+        const dk = req.query.date || dateKeyFromDateValue(now);
+        const dayRange = getDayRange(dk);
+        if (!dayRange) return { start: null, end: null, dateKey: dk };
+        return { start: dayRange.start, end: dayRange.end, dateKey: dk };
+      }
+
+      if (analysisType === 'weekly') {
+        const dk = req.query.date || dateKeyFromDateValue(now);
+        const [y, m, d] = dk.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+
+        // Mon..Sun week
+        const jsDay = dt.getDay(); // 0 Sun .. 6 Sat
+        const mondayOffset = (jsDay + 6) % 7; // Mon=0
+        const firstDay = new Date(dt);
+        firstDay.setDate(dt.getDate() - mondayOffset);
+        firstDay.setHours(0, 0, 0, 0);
+
+        const nextMondayExclusive = new Date(firstDay);
+        nextMondayExclusive.setDate(firstDay.getDate() + 7);
+        nextMondayExclusive.setHours(0, 0, 0, 0);
+
+        return { start: firstDay, end: nextMondayExclusive, dateKey: dk };
+      }
+
+      if (analysisType === 'monthly') {
+        const y = req.query.year ? Number.parseInt(req.query.year, 10) : now.getFullYear();
+        const m = req.query.month ? Number.parseInt(req.query.month, 10) : now.getMonth() + 1;
+        const dateKey = `${y}-${String(m).padStart(2, '0')}-01`;
+        return { start: new Date(y, m - 1, 1, 0, 0, 0, 0), end: new Date(y, m, 1, 0, 0, 0, 0), dateKey };
+      }
+
+      // predictive (next month of selected month/year)
+      const { year: ty, month: tm } = getPredictiveTargetMonth();
+      const dateKey = `${ty}-${String(tm).padStart(2, '0')}-01`;
+      return { start: new Date(ty, tm - 1, 1, 0, 0, 0, 0), end: new Date(ty, tm, 1, 0, 0, 0, 0), dateKey };
+    };
+
+    const { start, end, dateKey } = computeRange();
+    if (!start || !end) {
+      return res.status(400).json({ error: 'Invalid range.' });
     }
 
-    const basePipeline = [
-      {
-        $match: {
-          otp: null,
-        },
-      },
-      {
-        $addFields: {
-          appointmentDateTime: {
-            $ifNull: ['$scheduledStart', { $ifNull: ['$date', '$createdAt'] }],
-          },
-        },
-      },
-      {
-        $match: {
-          appointmentDateTime: { $gte: start, $lt: end },
-        },
-      },
-    ];
-
-    // Fetch appointments in range and compute aggregates in JS
     const rows = await Appointment.findAll({ where: { otp: null } });
-    const appointmentsInRange = rows.filter((r) => {
-      const obj = r.get ? r.get({ plain: true }) : r;
-      const appointmentDateTime = obj.scheduledStart || obj.date || obj.createdAt;
-      return appointmentDateTime >= start && appointmentDateTime < end;
-    });
 
-    const pieMap = new Map();
-    const lineMap = new Map();
-    const barMap = new Map();
+    const appointmentsInRange = rows
+      .map((r) => (r.get ? r.get({ plain: true }) : r))
+      .map((obj) => ({ obj, dt: toAppointmentDate(obj) }))
+      .filter((x) => x.dt && x.dt >= start && x.dt < end);
 
-    appointmentsInRange.forEach((r) => {
-      const obj = r.get ? r.get({ plain: true }) : r;
-      const appointmentDateTime = obj.scheduledStart || obj.date || obj.createdAt;
-      // pie (completed by service)
+    const pieMap = new Map(); // completed by service
+    const lineMap = new Map(); // day buckets for chart
+    const barMap = new Map(); // status distribution
+    const peakHourMap = new Map(); // 0..23
+
+    // Seed buckets so weekly/monthly sums/axes are consistent
+    if (analysisType === 'weekly') {
+      ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach((b) => lineMap.set(b, 0));
+    } else if (analysisType === 'monthly' || analysisType === 'predictive') {
+      const y = start.getFullYear();
+      const m0 = start.getMonth();
+      const daysInMonth = new Date(y, m0 + 1, 0).getDate();
+      for (let d = 1; d <= daysInMonth; d += 1) lineMap.set(String(d), 0);
+    } else if (analysisType === 'daily') {
+      lineMap.set('Total', 0);
+    }
+
+    const weekdayMonFirst = (d) => {
+      const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const lab = labels[d.getDay()];
+      const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return order.includes(lab) ? lab : 'Sun';
+    };
+
+    appointmentsInRange.forEach(({ obj, dt }) => {
       if (obj.status === 'completed') {
         pieMap.set(obj.service, (pieMap.get(obj.service) || 0) + 1);
       }
-      // line
-      const day = analysisType === 'daily' ? 'Total' : new Date(appointmentDateTime).getDate();
-      lineMap.set(day, (lineMap.get(day) || 0) + 1);
-      // bar
+
+      if (analysisType === 'daily') {
+        lineMap.set('Total', (lineMap.get('Total') || 0) + 1);
+      } else if (analysisType === 'weekly') {
+        const label = weekdayMonFirst(dt);
+        lineMap.set(label, (lineMap.get(label) || 0) + 1);
+      } else {
+        lineMap.set(String(dt.getDate()), (lineMap.get(String(dt.getDate())) || 0) + 1);
+      }
+
       barMap.set(obj.status, (barMap.get(obj.status) || 0) + 1);
+
+      const hour = dt.getHours();
+      peakHourMap.set(hour, (peakHourMap.get(hour) || 0) + 1);
     });
 
-    const pie = Array.from(pieMap.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
-    const line = Array.from(lineMap.entries()).map(([day, count]) => ({ day, count })).sort((a, b) => (analysisType === 'daily' ? 0 : a.day - b.day));
+    const pie = Array.from(pieMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+
+    const line = Array.from(lineMap.entries())
+      .map(([day, count]) => ({ day, count }))
+      .sort((a, b) => {
+        if (analysisType === 'weekly') {
+          const order = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+          return (order[a.day] || 0) - (order[b.day] || 0);
+        }
+        if (analysisType === 'daily') return 0;
+        return Number(a.day) - Number(b.day);
+      });
+
     const bar = Array.from(barMap.entries()).map(([status, count]) => ({ status, count }));
 
-    res.json({ type: analysisType, month: req.query.month ? Number.parseInt(req.query.month, 10) : undefined, year: req.query.year ? Number.parseInt(req.query.year, 10) : undefined, date: dateKey, pie, line, bar });
+    const peakHours = Array.from(peakHourMap.entries())
+      .map(([hour, count]) => ({ hour, count }))
+      .sort((a, b) => b.count - a.count || a.hour - b.hour)
+      .slice(0, 6);
+
+    let predictivePie = undefined;
+
+    if (analysisType === 'predictive') {
+      // forecast next month totals using previous 28 days completed average per service
+      const { year: ty, month: tm } = getPredictiveTargetMonth();
+      const targetStart = new Date(ty, tm - 1, 1, 0, 0, 0, 0);
+      const targetEnd = new Date(ty, tm, 1, 0, 0, 0, 0);
+
+      const histEnd = new Date(targetStart);
+      const histStart = new Date(targetStart);
+      histStart.setDate(histStart.getDate() - 28);
+
+      const completedHistory = rows
+        .map((r) => (r.get ? r.get({ plain: true }) : r))
+        .map((obj) => ({ obj, dt: toAppointmentDate(obj) }))
+        .filter((x) => x.dt && x.dt >= histStart && x.dt < histEnd && x.obj?.status === 'completed');
+
+      const daysTarget = Math.max(
+        1,
+        Math.round((targetEnd.getTime() - targetStart.getTime()) / (24 * 60 * 60 * 1000))
+      );
+      const scale = daysTarget / 28;
+
+      const totals28 = new Map();
+      completedHistory.forEach(({ obj }) => {
+        totals28.set(obj.service, (totals28.get(obj.service) || 0) + 1);
+      });
+
+      predictivePie = Array.from(totals28.entries())
+        .map(([service, total28]) => ({
+          name: service,
+          value: Math.max(0, Math.round(total28 * scale)),
+        }))
+        .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+
+      // include all known services
+      if (Array.isArray(ALLOWED_SERVICES)) {
+        ALLOWED_SERVICES.forEach((s) => {
+          if (!predictivePie.some((x) => x.name === s)) predictivePie.push({ name: s, value: 0 });
+        });
+        predictivePie.sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+      }
+    }
+
+    res.json({
+      type: analysisType,
+      month: req.query.month ? Number.parseInt(req.query.month, 10) : undefined,
+      year: req.query.year ? Number.parseInt(req.query.year, 10) : undefined,
+      date: dateKey,
+      pie,
+      line,
+      bar,
+      peakHours,
+      predictivePie,
+    });
   })
 );
 

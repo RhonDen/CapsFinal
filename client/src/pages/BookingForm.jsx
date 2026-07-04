@@ -132,10 +132,14 @@ function BookingForm() {
     const { name, value } = event.target;
 
     if (name === 'number') {
-      const digitsOnly = value.replace(/\D/g, '').slice(0, 11);
-      setForm((current) => ({ ...current, number: digitsOnly }));
+      // +63 is permanent.
+      // UI only collects the remaining 9 digits (e.g. 09175550123 -> 9175550123?; we normalize on submit).
+      // Here we store only digits and cap to 9 or 10/11 so user paste won't break typing.
+      const digitsOnly = value.replace(/\D/g, '');
+      setForm((current) => ({ ...current, number: digitsOnly.slice(0, 11) }));
       return;
     }
+
 
     setForm((current) => ({ ...current, [name]: value }));
   };
@@ -146,11 +150,27 @@ function BookingForm() {
     setError('');
     setSuccess('');
 
-    // Backend expects exactly 11 digits starting with 09 (regex: /^09\d{9}$/)
-    // Remove any formatting (ex: dashes) before sending.
+    // Backend accepts:
+    // - 09XXXXXXXXX (11 digits, starts with 09)
+    // - +639XXXXXXXXX (12 digits total, +63 + 10 digits)
+    // - 63XXXXXXXXXX (country code 63 + 10 digits)
+    //
+    // UI now collects ONLY the remaining 10 PH digits (e.g. 9997045304).
+    // Your feedback says: "baxk to 09 but all manual numbers"
+    // So for `9997045304`, we must submit: 09 + last9digits => 09997045304
+    // (and for other 10-digit inputs starting with 9, we do the same).
+    const digits = (form.number || '').toString().replace(/\D/g, '');
+
+    const normalized =
+      digits.length === 10 && digits.startsWith('9')
+        ? `09${digits.slice(1)}` // 09XXXXXXXXX
+        : digits.length === 11 && digits.startsWith('09')
+          ? digits // already 09XXXXXXXXX
+          : digits;
+
     const payload = {
       ...form,
-      number: (form.number || '').toString().replace(/\D/g, '').slice(0, 11),
+      number: normalized,
     };
 
     try {
@@ -279,24 +299,28 @@ function BookingForm() {
                 <label className="mb-1 block text-sm font-medium text-maastricht">
                   Phone Number *
                 </label>
-                <input
-                  name="number"
-                  type="text"
-                  placeholder="09175550123"
-                  value={form.number}
-                  onChange={handleChange}
-                  required
-                  inputMode="numeric"
-                  maxLength={11}
-                  pattern="[0-9]{11}"
-                  onBlur={() => {
-                    // Keep digits-only so backend regex /^09\d{9}$/ always matches.
-                    const raw = (form.number || '').replace(/\D/g, '').slice(0, 11);
-                    setForm((c) => ({ ...c, number: raw }));
-                  }}
-
-                  className="w-full rounded-2xl border border-gray-200 bg-white p-3 focus:border-silver-lake focus:outline-none focus:ring-4 focus:ring-silver-lake/15"
-                />
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-silver-lake">
+                    +63
+                  </span>
+                  <input
+                    name="number"
+                    type="text"
+                    value={form.number}
+                    onChange={handleChange}
+                    required
+                    inputMode="tel"
+                    maxLength={10}
+                    placeholder="9123456789"
+                    pattern="^9\d{9}$"
+                    onBlur={() => {
+                      const digitsOnly = (form.number || '').toString().replace(/\D/g, '');
+                      const normalized = digitsOnly.slice(-10); // +63 recipient requires 10 digits after +63
+                      setForm((c) => ({ ...c, number: normalized }));
+                    }}
+                    className="w-full rounded-2xl border border-gray-200 bg-white p-3 pl-14 focus:border-silver-lake focus:outline-none focus:ring-4 focus:ring-silver-lake/15"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

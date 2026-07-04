@@ -7,13 +7,20 @@ const UNISMS_ENDPOINT = 'https://unismsapi.com/api/sms';
 // but keep the required sender_id always included in the payload.
 const apiKey = 'sk_b27982d7-8017-47b3-9433-b338b61a5fae';
 
+// UniSMS sometimes rejects sender_id that is not provisioned.
+// This app will try multiple candidate sender_id values.
+// You can override/add candidates via UNISMS_SENDER_ID env var.
+
+
 const getSenderIdCandidates = () => {
   const envValue = (process.env.UNISMS_SENDER_ID || '').trim();
   const candidates = [];
   if (envValue) candidates.push(envValue);
 
   // Common defaults seen in past runs / deployments.
-  candidates.push('UniSMS', 'AppointEase');
+  // Include your provisioned sender_id too.
+  candidates.push('UnisoftSMS', 'UniSMS', 'AppointEase');
+
 
   // De-dupe while preserving order.
   return Array.from(new Set(candidates));
@@ -114,10 +121,25 @@ const sendSMS = async (phone, message, { metadata } = {}) => {
         timeout: 20000,
       });
 
+
+
       return response.data;
     } catch (err) {
       const providerBody = err?.response?.data;
       const status = err?.response?.status;
+
+      // Improve visibility: log the raw provider response (or full error message)
+      // so we can see the exact rejection reason.
+      console.error('UniSMS raw failure:', {
+        status,
+        responseData: providerBody,
+        responseHeaders: err?.response?.headers,
+        requestConfig: {
+          url: UNISMS_ENDPOINT,
+          hasPayload: Boolean(payload),
+        },
+        errorMessage: err?.message,
+      });
 
       // Retry ONLY when UniSMS indicates the sender_id is invalid.
       if (status === 422 && isInvalidSenderIdError(providerBody)) {
@@ -137,7 +159,8 @@ const sendSMS = async (phone, message, { metadata } = {}) => {
       e.recipient = recipient;
       e.payload = payload;
 
-      console.error('UniSMS send failed:', {
+      // Keep a compact log too (useful if raw log is too large)
+      console.error('UniSMS send failed (processed):', {
         status,
         provider: providerBody,
         recipient,
