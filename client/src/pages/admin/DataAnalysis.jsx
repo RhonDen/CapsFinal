@@ -64,6 +64,8 @@ function DataAnalysis() {
     predictivePie: [],
   });
 
+  const [selectedPredictiveService, setSelectedPredictiveService] = useState('');
+
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return Array.from({ length: 6 }, (_, index) => currentYear - 4 + index);
@@ -101,7 +103,7 @@ function DataAnalysis() {
 
               const valueNum = Number(rawValue);
               return {
-                ...item,
+                // Keep only what Recharts needs; avoid leaking unexpected keys
                 name: formatServiceLabel(String(rawName)),
                 value: Number.isFinite(valueNum) ? valueNum : 0,
               };
@@ -109,9 +111,13 @@ function DataAnalysis() {
             .filter((x) => x.name);
         };
 
+        const normalizedPredictivePie = normalizePie(
+          response.data.predictivePie || response.data.pie
+        );
+
         setData({
           pie: normalizePie(response.data.pie),
-          predictivePie: normalizePie(response.data.predictivePie || response.data.pie),
+          predictivePie: normalizedPredictivePie,
           line: response.data.line || [],
           bar: (response.data.bar || []).map((item) => ({
             ...item,
@@ -119,6 +125,17 @@ function DataAnalysis() {
           })),
           peakHours: Array.isArray(response.data.peakHours) ? response.data.peakHours : [],
         });
+
+        // Reset predictive selection when range changes
+        if (analysisType === 'predictive') {
+          setSelectedPredictiveService((prev) => {
+            const stillExists = normalizedPredictivePie.some((x) => x.name === prev);
+            if (stillExists) return prev;
+            return normalizedPredictivePie[0]?.name || '';
+          });
+        } else {
+          setSelectedPredictiveService('');
+        }
       } catch (error) {
         console.error('Analytics fetch error:', error);
       }
@@ -142,12 +159,25 @@ function DataAnalysis() {
       return `Analysis for the week starting ${selectedDate}: daily breakdown of appointments and status distribution.`;
     }
     if (analysisType === 'predictive') {
-      const monthLabel = MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label || 'Selected Month';
+      const monthLabel =
+        MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label || 'Selected Month';
       return `Forecast for the next month based on ${monthLabel} ${selectedYear} and recent demand.`;
     }
-    const monthLabel = MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label || 'Selected Month';
+    const monthLabel =
+      MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label || 'Selected Month';
     return `Analysis for ${monthLabel} ${selectedYear}: daily breakdown of completed services and status distribution.`;
   }, [analysisType, selectedDate, selectedMonth, selectedYear]);
+
+  const predictiveServiceDetails = useMemo(() => {
+    if (analysisType !== 'predictive') return null;
+    const list = Array.isArray(data.predictivePie) ? data.predictivePie : [];
+    const selected = selectedPredictiveService
+      ? list.find((x) => x.name === selectedPredictiveService) || null
+      : null;
+
+    const topN = list.slice(0, 8);
+    return { selected, topN, totalServices: list.length };
+  }, [analysisType, data.predictivePie, selectedPredictiveService]);
 
   return (
     <AdminPageShell title={title} description={description} icon={BarChart3}>
@@ -219,9 +249,6 @@ function DataAnalysis() {
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <PieChart>
-                  {/* keep stable rendering */}
-                </PieChart>
                 <Pie
                   data={analysisType === 'predictive' ? data.predictivePie : data.pie}
                   dataKey="value"
@@ -229,18 +256,117 @@ function DataAnalysis() {
                   cx="50%"
                   cy="50%"
                   outerRadius={88}
-                  label
+                  // Prevent chart/text overlap; we’ll rely on tooltip instead.
+                  label={false}
                 >
-                  {(analysisType === 'predictive' ? data.predictivePie : data.pie).map((entry, index) => (
-                    <Cell key={`${entry.name}-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
+                  {(analysisType === 'predictive' ? data.predictivePie : data.pie).map(
+                    (entry, index) => {
+                      const isSelected =
+                        analysisType === 'predictive' &&
+                        selectedPredictiveService &&
+                        entry?.name === selectedPredictiveService;
+
+                      return (
+                        <Cell
+                          key={`${entry.name}-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                          opacity={
+                            analysisType === 'predictive' && selectedPredictiveService
+                              ? isSelected
+                                ? 1
+                                : 0.35
+                              : 1
+                          }
+                          style={{
+                            cursor: analysisType === 'predictive' ? 'pointer' : 'default',
+                          }}
+                          onClick={() => {
+                            if (analysisType !== 'predictive') return;
+                            setSelectedPredictiveService(entry?.name || '');
+                          }}
+                        />
+                      );
+                    }
+                  )}
                 </Pie>
-                <Tooltip />
-                <Legend />
+                <Tooltip
+                  formatter={(value, _name, props) => {
+                    const name = props?.payload?.name;
+                    return [`${value}`, name];
+                  }}
+                />
+                {analysisType !== 'predictive' ? <Legend /> : null}
               </PieChart>
             </ResponsiveContainer>
           </div>
+
+          {analysisType === 'predictive' && predictiveServiceDetails ? (
+            <div className="mt-4 rounded-xl bg-slate-50 p-4 dark:bg-slate-900/30">
+              <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">
+                Selected forecast
+              </p>
+              <div className="mt-2 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-maastricht dark:text-slate-100">
+                    {predictiveServiceDetails.selected?.name || 'Click a pie segment'}
+                  </p>
+                  <p className="mt-1 text-sm text-police dark:text-slate-300">
+                    Predicted next-month appointments: <span className="font-semibold">{predictiveServiceDetails.selected?.value ?? 0}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
+
+        {analysisType === 'predictive' && predictiveServiceDetails ? (
+          <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+            <h2 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">
+              Predictive service picker
+            </h2>
+            <p className="mb-4 text-sm text-police dark:text-slate-300">
+              Click to focus. This won’t change other charts (backend returns predictive totals only),
+              but it makes the forecast board navigable.
+            </p>
+
+            <div className="flex flex-col gap-3">
+              {predictiveServiceDetails.topN.length ? (
+                predictiveServiceDetails.topN.map((entry, idx) => {
+                  const isSelected = entry.name === selectedPredictiveService;
+                  return (
+                    <button
+                      key={`${entry.name}-${idx}`}
+                      type="button"
+                      onClick={() => setSelectedPredictiveService(entry.name)}
+                      className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition ${
+                        isSelected
+                          ? 'border-maastricht bg-maastricht/10'
+                          : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span
+                          className="h-3.5 w-3.5 rounded-full"
+                          style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+                        />
+                        <span className="min-w-0 truncate text-sm font-semibold text-police">
+                          {entry.name}
+                        </span>
+                      </div>
+                      <span className={`text-sm font-semibold ${isSelected ? 'text-maastricht' : 'text-maastricht/90'}`}>
+                        {entry.value}
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-police dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+                  No predictive data available for the selected range.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
 
         <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
           <h2 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">

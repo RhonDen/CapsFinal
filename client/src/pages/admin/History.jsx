@@ -35,6 +35,15 @@ const subtractYearsAsISODate = (years) => {
   return d.toISOString().slice(0, 10);
 };
 
+const STATUS_STYLES = {
+  pending: 'bg-slate-50 text-slate-700 border-slate-200',
+  accepted: 'bg-emerald-50 text-emerald-900 border-emerald-200',
+  rejected: 'bg-rose-50 text-rose-900 border-rose-200',
+  completed: 'bg-emerald-600 text-white border-emerald-700',
+  // Use a darker amber for readable contrast with dark text.
+  notCompleted: 'bg-amber-300 text-slate-900 border-amber-400',
+};
+
 function History() {
   const today = useMemo(() => {
     const d = new Date();
@@ -113,10 +122,10 @@ function History() {
       backLabel="Dashboard"
       maxWidth="max-w-7xl"
     >
-      <div className="mb-6 flex flex-col gap-4 rounded-[28px] bg-white p-6 shadow-sm">
+      <div className="mb-6 flex flex-col gap-5 rounded-[28px] bg-white p-7 shadow-sm">
         <div className="flex items-center gap-2">
-          <Filter className="h-5 w-5 text-silver-lake" />
-          <p className="font-semibold text-maastricht">Filters</p>
+          <Filter className="h-6 w-6 text-silver-lake" />
+          <p className="text-lg font-semibold text-maastricht">Filters</p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
@@ -126,7 +135,7 @@ function History() {
               type="date"
               value={from}
               onChange={(e) => setFrom(formatDateOnly(e.target.value))}
-              className="rounded-xl border border-gray-200 p-3"
+              className="rounded-xl border border-gray-200 p-4 text-base"
             />
           </label>
 
@@ -136,7 +145,7 @@ function History() {
               type="date"
               value={to}
               onChange={(e) => setTo(formatDateOnly(e.target.value))}
-              className="rounded-xl border border-gray-200 p-3"
+              className="rounded-xl border border-gray-200 p-4 text-base"
             />
           </label>
 
@@ -145,7 +154,7 @@ function History() {
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="rounded-xl border border-gray-200 p-3"
+              className="rounded-xl border border-gray-200 p-4 text-base"
             >
               <option value="">All</option>
               {STATUSES.map((s) => (
@@ -162,7 +171,7 @@ function History() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="09xxxxxxxxx"
-              className="rounded-xl border border-gray-200 p-3"
+              className="rounded-xl border border-gray-200 p-4 text-base"
             />
           </label>
 
@@ -172,7 +181,7 @@ function History() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder="Type a name or number…"
-              className="rounded-xl border border-gray-200 p-3"
+              className="rounded-xl border border-gray-200 p-4 text-base"
             />
           </label>
         </div>
@@ -192,7 +201,7 @@ function History() {
             )}
           </button>
           {searchText ? (
-            <p className="text-sm text-police">
+            <p className="text-base text-police">
               Showing matches for <span className="font-semibold">{searchText}</span>
             </p>
           ) : null}
@@ -204,11 +213,11 @@ function History() {
       <div className="overflow-hidden rounded-[28px] bg-white shadow-sm">
         <div className="p-4 sm:p-6">
           {loading ? (
-            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-6 text-sm text-police">
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-7 text-base text-police">
               Loading history…
             </div>
           ) : effectiveRows.length === 0 ? (
-            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-6 text-sm text-police">
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-7 text-base text-police">
               No appointments found for selected filters.
             </div>
           ) : (
@@ -283,11 +292,13 @@ function History() {
                               return (
                                 <div
                                   key={s}
-                                  className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4"
+                                  className={`rounded-[18px] border p-4 ${
+                                    STATUS_STYLES[s] || 'border-slate-200 bg-slate-50/70 text-slate-700'
+                                  }`}
                                 >
                                   <div className="mb-3 flex items-center justify-between gap-3">
-                                    <p className="text-sm font-semibold text-maastricht">{label}</p>
-                                    <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-police">
+                                    <p className="text-base font-semibold text-slate-900">{label}</p>
+                                    <span className="rounded-full bg-white/70 px-3 py-1 text-sm font-semibold text-slate-700">
                                       {list.length}
                                     </span>
                                   </div>
@@ -300,34 +311,55 @@ function History() {
                                         const bt = b.scheduledStart || b.date || b.createdAt;
                                         return new Date(bt).getTime() - new Date(at).getTime();
                                       })
-                                      .map((r) => (
-                                        <article
-                                          key={r.id}
-                                          className="rounded-[18px] border border-slate-200 bg-white p-3"
-                                        >
-                                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                            <div className="min-w-0">
-                                              <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake">
-                                                {r.time || 'N/A'}
-                                              </p>
-                                              <h4 className="mt-1 break-words text-base font-semibold text-police">
-                                                {r.fullName || `${r.firstName || ''} ${r.lastName || ''}`.trim()}
-                                              </h4>
-                                              <p className="mt-1 text-sm font-semibold text-maastricht">
-                                                {r.service}
-                                              </p>
+                                      .map((r) => {
+                                        const pillClass =
+                                          r.status === 'completed'
+                                            ? 'bg-emerald-600 text-white border-emerald-700'
+                                            : r.status === 'notCompleted'
+                                              ? 'bg-amber-300 text-slate-900 border-amber-400'
+                                              : r.status === 'accepted'
+                                                ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                                : r.status === 'rejected'
+                                                  ? 'bg-rose-50 text-rose-900 border-rose-200'
+                                                  : 'bg-slate-50 text-slate-700 border-slate-200';
+
+                                        return (
+                                          <article
+                                            key={r.id}
+                                            className="rounded-[16px] border border-slate-200 bg-white p-3"
+                                          >
+                                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                              <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                  <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                                                    {r.time || 'N/A'}
+                                                  </p>
+                                                  <span
+                                                    className={`rounded-full border px-3 py-1 text-sm font-semibold ${pillClass}`}
+                                                  >
+                                                    {STATUS_LABELS_FALLBACK[r.status] || r.status}
+                                                  </span>
+                                                </div>
+                                                <h4 className="mt-2 break-words text-lg font-semibold text-slate-900">
+                                                  {r.fullName ||
+                                                    `${r.firstName || ''} ${r.lastName || ''}`.trim()}
+                                                </h4>
+                                                <p className="mt-1 text-base font-semibold text-slate-700">
+                                                  {r.service}
+                                                </p>
+                                              </div>
+                                              <div className="flex flex-col gap-1 sm:items-end">
+                                                <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                                                  Phone
+                                                </p>
+                                                <p className="text-base font-semibold text-slate-900 whitespace-nowrap">
+                                                  {r.number}
+                                                </p>
+                                              </div>
                                             </div>
-                                            <div className="flex flex-col gap-1 sm:items-end">
-                                              <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake">
-                                                Phone
-                                              </p>
-                                              <p className="text-sm font-semibold text-police whitespace-nowrap">
-                                                {r.number}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </article>
-                                      ))}
+                                          </article>
+                                        );
+                                      })}
                                   </div>
                                 </div>
                               );

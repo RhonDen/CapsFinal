@@ -6,6 +6,7 @@ import ScreenLoader from './components/ScreenLoader.jsx';
 
 
 const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
+const BlankProbe = lazy(() => import('./pages/BlankProbe.jsx'));
 const BookingRouter = lazy(() => import('./pages/BookingRouter.jsx'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin.jsx'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard.jsx'));
@@ -28,7 +29,7 @@ function AppRoutes() {
         >
           {/* Keyed wrapper: animates any top-level route change */}
           <div key={location.pathname} className="animate-panel-in">
-            <Routes>
+              <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/booking/*" element={<BookingRouter />} />
               <Route path="/admin/login" element={<AdminLogin />} />

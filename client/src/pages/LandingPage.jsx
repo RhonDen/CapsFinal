@@ -16,8 +16,10 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
 import AboutClinicSection from '../components/AboutClinicSection.jsx';
 import SectionHeading from '../components/SectionHeading.jsx';
+import PublicDarkModeToggle from '../components/PublicDarkModeToggle.jsx';
 import { FEATURED_SERVICES } from '../constants/services.js';
 import { formatServiceLabel } from '../utils/schedule.js';
 
@@ -47,47 +49,10 @@ const team = [
     role: 'Research And Database',
     photo: rainiel,
     facebook: 'https://www.facebook.com/Extraordina.rain.69',
-    instagram: '',
-    github: '',
+    instagram: 'https://www.instagram.com/got.thekush/',
+    github: 'https://github.com/Rainiel27',
   },
 ];
-
-import PublicDarkModeToggle from '../components/PublicDarkModeToggle.jsx';
-
-// Add Spline hero background as a lightweight visual layer.
-const SplineHero = () => {
-  const prefersReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  if (prefersReducedMotion) {
-    return (
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
-        aria-hidden="true"
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_60%_20%,rgba(142,199,234,0.25),transparent_40%)]" />
-      </div>
-    );
-  }
-
-  // Avoid runtime errors if the Spline web component isn't registered.
-  // The page will still look good without the hero animation.
-  return (
-    <div
-      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
-      aria-hidden="true"
-    >
-      <spline-viewer
-        url="https://prod.spline.design/9BNhFhTDvHT5pqDj/scene.splinecode"
-        className="absolute inset-0 h-full w-full"
-        style={{ transform: 'scale(1.08)' }}
-      />
-    </div>
-  );
-};
-
 
 function LandingPage() {
   const [contactForm, setContactForm] = useState({
@@ -101,8 +66,6 @@ function LandingPage() {
   const handleContactSubmit = async (event) => {
     event.preventDefault();
 
-    // Extra safety: if user double-clicks or submits again quickly,
-    // keep it from sending again.
     if (submitting) return;
 
     if (!contactForm.name.trim() || !contactForm.email.trim()) {
@@ -117,13 +80,18 @@ function LandingPage() {
     setContactStatus({ type: '', message: '' });
 
     try {
-      const response = await axios.post('/api/contact/messages', contactForm);
+      const response = await axios.post(
+        '/api/contact/messages',
+        contactForm
+      );
       setContactStatus({ type: 'success', message: response.data.message });
       setContactForm({ name: '', email: '', message: '' });
     } catch (requestError) {
       setContactStatus({
         type: 'error',
-        message: requestError.response?.data?.error || 'Unable to send your message right now.',
+        message:
+          requestError.response?.data?.error ||
+          'Unable to send your message right now.',
       });
     } finally {
       setSubmitting(false);
@@ -133,32 +101,18 @@ function LandingPage() {
   const handleContactChange = (event) => {
     const { name, value } = event.target;
     setContactForm((current) => ({ ...current, [name]: value }));
-    if (contactStatus.message) {
-      setContactStatus({ type: '', message: '' });
-    }
+    if (contactStatus.message) setContactStatus({ type: '', message: '' });
   };
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f7fbff_0%,#f9fcff_100%)] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <PublicDarkModeToggle />
 
-      <section className="relative isolate overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(142,199,234,0.45),_transparent_28%),linear-gradient(135deg,_#061A2C,_#0B2B45_45%,_#123C66_100%)] px-6 py-24 text-white sm:px-8 lg:px-10 dark:text-slate-100">
-        <SplineHero />
-
-        {/* Dark-blue layered atmosphere */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.16),transparent_25%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_90%,rgba(14,116,144,0.18),transparent_35%)]" />
-        <div className="absolute -left-10 top-16 h-44 w-44 rounded-full bg-cyan-300/15 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-sky-400/10 blur-3xl" />
-
-        {/* Subtle grid overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.14] [background-image:linear-gradient(to_right,rgba(255,255,255,0.25)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.25)_1px,transparent_1px)] [background-size:48px_48px]"
-          aria-hidden="true"
-        />
-
-        <div className="relative mx-auto max-w-6xl">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium backdrop-blur">
+      {/* HERO (first visible section) */}
+      <section className="relative isolate overflow-hidden px-6 py-24 text-white sm:px-8 lg:px-10 dark:text-slate-100">
+        <div className="landing-ui-verse pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
+        <div className="relative z-10 mx-auto max-w-6xl">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
             <Sparkles className="h-4 w-4 text-cyan-200" />
             Trusted care, made effortless
           </div>
@@ -168,43 +122,45 @@ function LandingPage() {
               <h1 className="mb-3 text-4xl font-bold leading-tight tracking-tight md:text-6xl">
                 Dents-City
               </h1>
+
               <p className="mb-4 max-w-2xl text-lg font-medium text-cyan-100 md:text-xl">
                 In a city full of smiles, we care with warmth, clarity, and confidence.
               </p>
 
               <p className="mx-auto mb-8 max-w-2xl text-lg text-cyan-50/90 md:text-xl lg:mx-0">
-                Book your dental appointment in minutes, receive fast SMS confirmation,
-                and enjoy a polished experience designed around comfort and trust.
+                Book your dental appointment in minutes, receive fast SMS confirmation, and
+                enjoy a polished experience designed around comfort and trust.
               </p>
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
                   to="/booking"
-                  className="inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-lg font-semibold text-maastricht shadow-lg transition hover:-translate-y-0.5 hover:bg-cyan-50"
+                  className="inline-flex items-center justify-center rounded-full bg-maastricht px-7 py-3 text-lg font-semibold text-white shadow-lg transition hover:bg-police"
                 >
                   <Calendar className="mr-2 h-5 w-5" />
                   Book Now
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
+
                 <a
                   href="#services"
-                  className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/10 px-7 py-3 text-lg font-semibold text-white backdrop-blur transition hover:bg-white/20"
+                  className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/5 px-7 py-3 text-lg font-semibold text-white transition hover:bg-white/10 dark:text-white"
                 >
                   Explore Services
                 </a>
               </div>
             </div>
 
-            <div className="rounded-[30px] border border-white/15 bg-white/10 p-6 shadow-[0_18px_60px_rgba(3,15,34,0.25)] backdrop-blur">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="rounded-2xl bg-white/15 p-3">
+            <div className="rounded-[30px] border border-white/15 bg-white/5 p-6 shadow-[0_18px_60px_rgba(3,15,34,0.25)]">
+              <div className="mb-5 flex items-start gap-3">
+                <div className="rounded-2xl bg-white/10 p-3">
                   <Smile className="h-6 w-6 text-cyan-100" />
                 </div>
-                <div>
+                <div className="pt-0.5">
                   <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-100">
                     What you can expect
                   </p>
-                  <p className="text-xl font-semibold text-white">
+                  <p className="mt-2 text-xl font-semibold text-white">
                     Comfort, clarity, and care in every visit
                   </p>
                 </div>
@@ -230,14 +186,14 @@ function LandingPage() {
                 ].map((item) => (
                   <div
                     key={item.title}
-                    className="flex gap-3 rounded-2xl border border-white/10 bg-slate-950/15 p-4"
+                    className="flex gap-3 rounded-2xl border border-white/10 bg-black/10 p-4"
                   >
-                    <div className="mt-0.5 rounded-xl bg-white/15 p-2">
+                    <div className="mt-0.5 rounded-xl bg-white/10 p-2">
                       <item.icon className="h-4 w-4 text-cyan-100" />
                     </div>
-                    <div>
-                      <p className="font-semibold text-white">{item.title}</p>
-                      <p className="text-sm text-cyan-50/80">{item.text}</p>
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold text-white">{item.title}</p>
+                      <p className="text-sm leading-relaxed text-cyan-50/85">{item.text}</p>
                     </div>
                   </div>
                 ))}
@@ -251,7 +207,10 @@ function LandingPage() {
               { label: 'Patient satisfaction', value: '98%' },
               { label: 'Verified care', value: 'Secure' },
             ].map((stat) => (
-              <div key={stat.label} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+              <div
+                key={stat.label}
+                className="rounded-2xl border border-white/15 bg-white/10 p-4"
+              >
                 <p className="text-sm text-cyan-100">{stat.label}</p>
                 <p className="mt-1 text-2xl font-semibold text-white">{stat.value}</p>
               </div>
@@ -287,9 +246,7 @@ function LandingPage() {
                     <h3 className="mb-2 text-xl font-semibold text-maastricht dark:text-slate-100">
                       {name}
                     </h3>
-                    <p className="text-police dark:text-slate-200">
-                      Duration: {duration}
-                    </p>
+                    <p className="text-police dark:text-slate-200">Duration: {duration}</p>
                   </div>
                 );
               })}
@@ -317,9 +274,7 @@ function LandingPage() {
                 <h3 className="text-xl font-semibold text-maastricht dark:text-slate-100">
                   {member.name}
                 </h3>
-                <p className="mb-4 text-silver-lake dark:text-cyan-200">
-                  {member.role}
-                </p>
+                <p className="mb-4 text-silver-lake dark:text-cyan-200">{member.role}</p>
 
                 <div className="flex gap-3">
                   <a
@@ -422,13 +377,20 @@ function LandingPage() {
                   <Phone className="h-5 w-5" />
                   {submitting ? 'Sending...' : 'Send Message'}
                 </button>
+
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   Messages are sent directly to the admin inbox.
                 </p>
               </form>
 
               {contactStatus.message ? (
-                <p className={`mt-4 text-sm ${contactStatus.type === 'success' ? 'text-green-700 dark:text-emerald-300' : 'text-red-700 dark:text-rose-300'}`}>
+                <p
+                  className={`mt-4 text-sm ${
+                    contactStatus.type === 'success'
+                      ? 'text-green-700 dark:text-emerald-300'
+                      : 'text-red-700 dark:text-rose-300'
+                  }`}
+                >
                   {contactStatus.message}
                 </p>
               ) : null}
@@ -441,4 +403,3 @@ function LandingPage() {
 }
 
 export default LandingPage;
-
