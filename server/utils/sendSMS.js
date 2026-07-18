@@ -17,9 +17,8 @@ const getSenderIdCandidates = () => {
   const candidates = [];
   if (envValue) candidates.push(envValue);
 
-  // Common defaults seen in past runs / deployments.
-  // Include your provisioned sender_id too.
-  candidates.push('UnisoftSMS', 'UniSMS', 'AppointEase');
+  // Force the single confirmed sender id.
+  candidates.push('Unisoft');
 
 
   // De-dupe while preserving order.

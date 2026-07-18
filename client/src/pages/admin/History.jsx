@@ -113,6 +113,31 @@ function History() {
     });
   }, [rows, searchText]);
 
+  // Normalize phone so +63 and 09 are treated as the same person.
+  // Canonical strategy:
+  // - digitsOnly
+  // - if starts with "63" => remove leading "63"
+  // - if starts with "0" => remove leading "0"
+  // - keep remaining digits (if unusually long, keep last 10)
+  const normalizePhoneKey = (value) => {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return '';
+
+    let key = digits;
+    if (key.startsWith('63')) key = key.slice(2);
+    if (key.startsWith('0')) key = key.slice(1);
+
+    if (key.length > 10) key = key.slice(-10);
+    return key;
+  };
+
+  const getFullNameForRow = (r) => {
+    const fromFull = String(r.fullName || '').trim();
+    if (fromFull) return fromFull;
+    const composed = `${r.firstName || ''} ${r.lastName || ''}`.trim();
+    return composed || 'Unknown';
+  };
+
   return (
     <AdminPageShell
       title="Appointment History"
@@ -224,60 +249,117 @@ function History() {
             (() => {
               const statusOrder = ['pending', 'accepted', 'rejected', 'completed', 'notCompleted'];
 
-              // Group by dateKey (or date), newest first
-              const byDate = new Map();
+              // Normalize phone so +63 and 09 are treated as the same person.
+              // Canonical strategy:
+              // - digitsOnly
+              // - if starts with "63" => remove leading "63"
+              // - if starts with "0" => remove leading "0"
+              // - keep remaining digits (if unusually long, keep last 10)
+              const normalizePhoneKey = (value) => {
+                const digits = String(value || '').replace(/\D/g, '');
+                if (!digits) return '';
+
+                let key = digits;
+                if (key.startsWith('63')) key = key.slice(2);
+                if (key.startsWith('0')) key = key.slice(1);
+
+                if (key.length > 10) key = key.slice(-10);
+                return key;
+              };
+
+              const getFullNameForRow = (r) => {
+                const fromFull = String(r.fullName || '').trim();
+                if (fromFull) return fromFull;
+                return `${r.firstName || ''} ${r.lastName || ''}`.trim() || 'Unknown';
+              };
+
+              // Folder grouping by normalized phone number.
+              // Each folder shows the latest appointment date on top,
+              // and inside shows past/previous appointments (newest -> oldest).
+              const byPhone = new Map();
 
               effectiveRows.forEach((r) => {
-                const dateKey = r.dateKey || r.date;
-                const dateLabelKey = dateKey ? String(dateKey) : 'unknown';
-                const bucket = byDate.get(dateLabelKey) || [];
+                const phoneKey = normalizePhoneKey(r.number);
+                const key = phoneKey || `unknown:${String(r.id ?? '')}`;
+
+                const bucket = byPhone.get(key) || [];
                 bucket.push(r);
-                byDate.set(dateLabelKey, bucket);
+                byPhone.set(key, bucket);
               });
 
-              const sortedDateKeys = Array.from(byDate.keys()).sort((a, b) => {
-                const da = new Date(a).getTime();
-                const db = new Date(b).getTime();
-                if (!Number.isFinite(da) && !Number.isFinite(db)) return String(b).localeCompare(String(a));
-                if (!Number.isFinite(da)) return 1;
-                if (!Number.isFinite(db)) return -1;
-                return db - da;
-              });
+              const phoneFolders = Array.from(byPhone.entries())
+                .map(([key, appts]) => {
+                  const sorted = appts.slice().sort((a, b) => {
+                    const at = a.scheduledStart || a.date || a.createdAt;
+                    const bt = b.scheduledStart || b.date || b.createdAt;
+                    return new Date(bt).getTime() - new Date(at).getTime();
+                  });
+
+                  const latest = sorted[0];
+                  const latestDateKey = latest?.dateKey || latest?.date || latest?.scheduledStart || latest?.createdAt;
+
+                  return { key, appts: sorted, latestDateKey };
+                })
+                .sort((a, b) => {
+                  const da = new Date(a.latestDateKey).getTime();
+                  const db = new Date(b.latestDateKey).getTime();
+                  if (!Number.isFinite(da) && !Number.isFinite(db)) return String(b.key).localeCompare(String(a.key));
+                  if (!Number.isFinite(da)) return 1;
+                  if (!Number.isFinite(db)) return -1;
+                  return db - da;
+                });
+
+              const getLatestNice = (row) => {
+                const dk = row?.dateKey || row?.date;
+                return dk ? formatDateKeyToNice(dk) : 'N/A';
+              };
 
               return (
                 <div className="space-y-6">
-                  {sortedDateKeys.map((dateKey) => {
-                    const dateRows = byDate.get(dateKey) || [];
+                  {phoneFolders.map((folder) => {
+                    const appts = folder.appts;
+
+                    // Canonical display name = name from latest appointment (handles “same number different name”)
+                    const latestRow = appts[0];
+                    const latestName = getFullNameForRow(latestRow);
+
+                    // Group appointments within the folder by status (cards),
+                    // but list items are ordered newest -> oldest.
                     const groupedByStatus = statusOrder.reduce((acc, s) => {
                       acc[s] = [];
                       return acc;
                     }, {});
-                    dateRows.forEach((r) => {
+
+                    appts.forEach((r) => {
                       const s = r.status;
                       if (!groupedByStatus[s]) groupedByStatus[s] = [];
                       groupedByStatus[s].push(r);
                     });
 
-                    const hasAny = Object.values(groupedByStatus).some((arr) => arr.length > 0);
-
-                    if (!hasAny) return null;
+                    const folderLatestNice = getLatestNice(latestRow);
 
                     return (
                       <section
-                        key={dateKey}
+                        key={folder.key}
                         className="rounded-[28px] border border-slate-200 bg-white shadow-sm"
                       >
                         <div className="flex flex-col gap-2 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake">
-                              Date
+                              Client folder
                             </p>
-                            <h3 className="mt-1 text-xl font-semibold text-maastricht">
-                              {formatDateKeyToNice(dateKey)}
+                            <h3 className="mt-1 text-xl font-semibold text-maastricht break-words">
+                              {latestName}
                             </h3>
                             <p className="mt-1 text-sm text-police">
-                              {dateRows.length} appointment{dateRows.length === 1 ? '' : 's'}
+                              Latest: {folderLatestNice} • {appts.length} appointment{appts.length === 1 ? '' : 's'}
                             </p>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-full bg-slate-50 px-4 py-2 text-sm font-semibold text-police whitespace-nowrap">
+                              {latestRow?.number || 'N/A'}
+                            </div>
                           </div>
                         </div>
 
@@ -304,62 +386,56 @@ function History() {
                                   </div>
 
                                   <div className="space-y-3">
-                                    {list
-                                      .slice()
-                                      .sort((a, b) => {
-                                        const at = a.scheduledStart || a.date || a.createdAt;
-                                        const bt = b.scheduledStart || b.date || b.createdAt;
-                                        return new Date(bt).getTime() - new Date(at).getTime();
-                                      })
-                                      .map((r) => {
-                                        const pillClass =
-                                          r.status === 'completed'
-                                            ? 'bg-emerald-600 text-white border-emerald-700'
-                                            : r.status === 'notCompleted'
-                                              ? 'bg-amber-300 text-slate-900 border-amber-400'
-                                              : r.status === 'accepted'
-                                                ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                                                : r.status === 'rejected'
-                                                  ? 'bg-rose-50 text-rose-900 border-rose-200'
-                                                  : 'bg-slate-50 text-slate-700 border-slate-200';
+                                    {list.map((r) => {
+                                      const pillClass =
+                                        r.status === 'completed'
+                                          ? 'bg-emerald-600 text-white border-emerald-700'
+                                          : r.status === 'notCompleted'
+                                            ? 'bg-amber-300 text-slate-900 border-amber-400'
+                                            : r.status === 'accepted'
+                                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                              : r.status === 'rejected'
+                                                ? 'bg-rose-50 text-rose-900 border-rose-200'
+                                                : 'bg-slate-50 text-slate-700 border-slate-200';
 
-                                        return (
-                                          <article
-                                            key={r.id}
-                                            className="rounded-[16px] border border-slate-200 bg-white p-3"
-                                          >
-                                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                              <div className="min-w-0">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                  <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                                                    {r.time || 'N/A'}
-                                                  </p>
-                                                  <span
-                                                    className={`rounded-full border px-3 py-1 text-sm font-semibold ${pillClass}`}
-                                                  >
-                                                    {STATUS_LABELS_FALLBACK[r.status] || r.status}
-                                                  </span>
-                                                </div>
-                                                <h4 className="mt-2 break-words text-lg font-semibold text-slate-900">
-                                                  {r.fullName ||
-                                                    `${r.firstName || ''} ${r.lastName || ''}`.trim()}
-                                                </h4>
-                                                <p className="mt-1 text-base font-semibold text-slate-700">
-                                                  {r.service}
-                                                </p>
-                                              </div>
-                                              <div className="flex flex-col gap-1 sm:items-end">
+                                      // list is already newest->oldest due to folder sorting,
+                                      // but statuses grouping preserves original order from appts.
+                                      return (
+                                        <article
+                                          key={r.id}
+                                          className="rounded-[16px] border border-slate-200 bg-white p-3"
+                                        >
+                                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                            <div className="min-w-0">
+                                              <div className="flex flex-wrap items-center gap-2">
                                                 <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                                                  Phone
+                                                  {r.time || 'N/A'}
                                                 </p>
-                                                <p className="text-base font-semibold text-slate-900 whitespace-nowrap">
-                                                  {r.number}
-                                                </p>
+                                                <span
+                                                  className={`rounded-full border px-3 py-1 text-sm font-semibold ${pillClass}`}
+                                                >
+                                                  {STATUS_LABELS_FALLBACK[r.status] || r.status}
+                                                </span>
                                               </div>
+                                              <h4 className="mt-2 break-words text-lg font-semibold text-slate-900">
+                                                {getFullNameForRow(r)}
+                                              </h4>
+                                              <p className="mt-1 text-base font-semibold text-slate-700">
+                                                {r.service}
+                                              </p>
                                             </div>
-                                          </article>
-                                        );
-                                      })}
+                                            <div className="flex flex-col gap-1 sm:items-end">
+                                              <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                                                Phone
+                                              </p>
+                                              <p className="text-base font-semibold text-slate-900 whitespace-nowrap">
+                                                {r.number}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </article>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               );

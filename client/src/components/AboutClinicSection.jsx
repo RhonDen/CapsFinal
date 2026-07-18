@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Building2, Eye, MapPin, Target } from 'lucide-react';
 import SectionHeading from './SectionHeading.jsx';
+import officeImg from '../assets/Office.png';
 
 // Render the article-style about section for the dental clinic landing page.
 function AboutClinicSection() {
@@ -15,7 +16,7 @@ function AboutClinicSection() {
     >
       <div className="mx-auto max-w-6xl">
         <SectionHeading
-          title="About Our Clinic"
+          title="About Us"
           icon={Building2}
           className="justify-center text-center"
         />
@@ -23,7 +24,7 @@ function AboutClinicSection() {
         <div className="grid items-center gap-10 md:grid-cols-2">
           <div className="overflow-hidden rounded-2xl">
             <img
-              src="/images/clinic-interior.jpg"
+              src={officeImg}
               alt="Modern dental office"
               className="h-auto w-full rounded-2xl object-cover shadow-lg transition-transform duration-300 hover:scale-105"
             />
@@ -31,7 +32,7 @@ function AboutClinicSection() {
 
           <article className="space-y-4 text-lg leading-relaxed text-police dark:text-slate-200">
             <p className="first-letter:float-left first-letter:mr-2 first-letter:text-5xl first-letter:font-bold first-letter:leading-tight first-letter:text-maastricht dark:first-letter:text-slate-100">
-              Dents-City was founded in 2018 with a single mission: to make
+              Dents-City was founded in 2025 with a single mission: to make
               dental care comfortable, transparent, and accessible. Our
               state-of-the-art clinic combines advanced technology with a
               patient-first philosophy.
@@ -43,7 +44,7 @@ function AboutClinicSection() {
               smile changes lives, and we’re here to help you achieve it.
             </p>
             <p className="italic text-silver-lake">
-              — Dr. Alexandra Chen, Lead Dentist
+              — Dents-City Team
             </p>
           </article>
         </div>

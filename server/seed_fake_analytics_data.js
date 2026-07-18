@@ -79,6 +79,13 @@ async function main() {
   const total = Number(process.env.SEED_FAKE_APPOINTMENTS_TOTAL || 50);
   const daysBack = Number(process.env.SEED_FAKE_APPOINTMENTS_DAYS_BACK || 20);
 
+  // By default, this seed should NOT run and create fake data.
+  // To generate fake appointments, set SEED_FAKE_APPOINTMENTS_ENABLED=true.
+  const enabled = String(process.env.SEED_FAKE_APPOINTMENTS_ENABLED || '').toLowerCase() === 'true';
+
+  // If true, we only purge already-seeded fakes and exit (no new inserts).
+  const purgeOnly = String(process.env.SEED_FAKE_APPOINTMENTS_PURGE_ONLY || '').toLowerCase() === 'true';
+
   // Ensure DB connection + model registration
   await connectDatabase();
 
@@ -136,9 +143,20 @@ async function main() {
     return 'accepted';
   }
 
-  // Remove existing fake-ish appointments to avoid duplication on re-runs
-  // We heuristically delete appointments with otp=null and notes starting with '[FAKE]'
-  await Appointment.destroy({ where: { notes: { [require('sequelize').Op.like]: '[FAKE]%' } } });
+  // Remove existing fake-ish appointments.
+  // Only delete the ones created by the seed: notes starting with '[FAKE]'
+  const { Op } = require('sequelize');
+  await Appointment.destroy({ where: { notes: { [Op.like]: '[FAKE]%' } } });
+
+  if (purgeOnly) {
+    console.log('Purged fake appointments only (notes starting with [FAKE]).');
+    return;
+  }
+
+  if (!enabled) {
+    console.log('SEED_FAKE_APPOINTMENTS_ENABLED is not true; skipping fake appointment seeding.');
+    return;
+  }
 
   const firstNames = ['John', 'Maria', 'Ali', 'Sara', 'David', 'Layla', 'Omar', 'Nina', 'Chen', 'Priya'];
   const lastNames = ['Smith', 'Garcia', 'Hassan', 'Nguyen', 'Brown', 'Khan', 'Patel', 'Kim', 'Martin', 'Wilson'];

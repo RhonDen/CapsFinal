@@ -109,33 +109,32 @@ function LandingPage() {
       <PublicDarkModeToggle />
 
       {/* HERO (first visible section) */}
-      <section className="relative isolate overflow-hidden px-6 py-24 text-white sm:px-8 lg:px-10 dark:text-slate-100">
+      <section className="relative isolate overflow-hidden px-6 py-24 sm:px-8 lg:px-10 dark:text-slate-100">
         <div className="landing-ui-verse pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
         <div className="relative z-10 mx-auto max-w-6xl">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-2 text-sm font-semibold text-white shadow-sm">
             <Sparkles className="h-4 w-4 text-cyan-200" />
             Trusted care, made effortless
           </div>
 
           <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="text-left">
-              <h1 className="mb-3 text-4xl font-bold leading-tight tracking-tight md:text-6xl">
+              <h1 className="mb-3 text-4xl font-bold leading-tight tracking-tight text-white md:text-6xl">
                 Dents-City
               </h1>
 
-              <p className="mb-4 max-w-2xl text-lg font-medium text-cyan-100 md:text-xl">
-                In a city full of smiles, we care with warmth, clarity, and confidence.
+              <p className="mb-4 max-w-2xl text-lg font-medium text-white/90 md:text-xl">
+                A modern dental office built around clear communication and gentle care.
               </p>
 
-              <p className="mx-auto mb-8 max-w-2xl text-lg text-cyan-50/90 md:text-xl lg:mx-0">
-                Book your dental appointment in minutes, receive fast SMS confirmation, and
-                enjoy a polished experience designed around comfort and trust.
+              <p className="mx-auto mb-8 max-w-2xl text-lg text-white/85 md:text-xl lg:mx-0">
+                Book in minutes, get quick SMS confirmation, and show up knowing exactly what to expect.
               </p>
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
                   to="/booking"
-                  className="inline-flex items-center justify-center rounded-full bg-maastricht px-7 py-3 text-lg font-semibold text-white shadow-lg transition hover:bg-police"
+                  className="inline-flex items-center justify-center rounded-full bg-maastricht px-7 py-3 text-lg font-semibold text-white transition hover:bg-police focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-transparent"
                 >
                   <Calendar className="mr-2 h-5 w-5" />
                   Book Now
@@ -151,13 +150,13 @@ function LandingPage() {
               </div>
             </div>
 
-            <div className="rounded-[30px] border border-white/15 bg-white/5 p-6 shadow-[0_18px_60px_rgba(3,15,34,0.25)]">
+            <div className="rounded-[30px] border border-white/20 bg-white/10 p-6 shadow-sm">
               <div className="mb-5 flex items-start gap-3">
-                <div className="rounded-2xl bg-white/10 p-3">
-                  <Smile className="h-6 w-6 text-cyan-100" />
+                <div className="rounded-2xl bg-white/15 p-3">
+                  <Smile className="h-6 w-6 text-cyan-200" />
                 </div>
                 <div className="pt-0.5">
-                  <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-100">
+                  <p className="text-sm font-semibold uppercase tracking-[0.28em] text-white/90">
                     What you can expect
                   </p>
                   <p className="mt-2 text-xl font-semibold text-white">
