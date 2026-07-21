@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../api.js';
 import { ArrowLeft, Mail, MessageSquare, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
@@ -41,7 +41,7 @@ function Inbox() {
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const response = await axios.get(`/api/contact/messages`, { withCredentials: true });
+        const response = await api.get(`/api/contact/messages`);
         setMessages(response.data.messages || []);
 
       } catch (requestError) {
@@ -74,7 +74,7 @@ function Inbox() {
     if (!messageId) return;
 
     try {
-      await axios.patch(`/api/contact/messages/${messageId}/read`, {}, { withCredentials: true });
+      await api.patch(`/api/contact/messages/${messageId}/read`);
 
       setMessages((current) =>
         current.map((message) =>

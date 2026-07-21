@@ -1,6 +1,6 @@
 import { CalendarRange, FileText, History, ShieldCheck } from 'lucide-react';
-import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
+import api from '../api.js';
 import { Link } from 'react-router-dom';
 import PublicDarkModeToggle from '../components/PublicDarkModeToggle.jsx';
 
@@ -17,7 +17,7 @@ function BookingPortalHome() {
       setBlockedError('');
 
       try {
-        const response = await axios.get('/api/public/blocked-dates');
+        const response = await api.get('/api/public/blocked-dates');
         if (!isMounted) return;
         setBlockedDates(response.data || []);
       } catch (err) {

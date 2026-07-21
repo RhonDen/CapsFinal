@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api.js';
 import { Loader2, Lock } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +17,7 @@ function AdminLogin() {
     setError('');
 
     try {
-      await axios.post('/api/admin/login', { username, password }, { withCredentials: true });
+      await api.post('/api/admin/login', { username, password });
       navigate('/admin/dashboard');
     } catch (requestError) {
       if (!requestError.response) {

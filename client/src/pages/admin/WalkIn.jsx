@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../api.js';
 import { CheckCircle, Loader2, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
@@ -45,7 +45,7 @@ function WalkIn() {
       setSlotMessage('');
 
       try {
-      const response = await axios.get('/api/bookings/availability', {
+      const response = await api.get('/api/bookings/availability', {
           params: {
             date: form.date,
             service: form.service,
@@ -117,7 +117,7 @@ function WalkIn() {
     setMessage('');
 
     try {
-      const response = await axios.post('/api/admin/walk-in', form);
+      const response = await api.post('/api/admin/walk-in', form);
       const serialNumber = response.data.appointment?.serialNumber;
 
       setMessageType('success');

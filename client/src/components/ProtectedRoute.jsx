@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api.js';
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 
@@ -11,9 +11,7 @@ function ProtectedRoute({ children }) {
     const verifyAdmin = async () => {
       try {
         const token = null;
-        const response = await axios.get('/api/admin/check-auth', {
-          withCredentials: true,
-        });
+        const response = await api.get('/api/admin/check-auth');
         if (isMounted) {
           setIsAuth(Boolean(response?.data?.authenticated));
         }

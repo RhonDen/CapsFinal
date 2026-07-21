@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../api.js';
 import { CalendarX, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
@@ -32,7 +32,7 @@ function BlockDates() {
 
   const fetchDates = async () => {
     try {
-        const response = await axios.get('/api/admin/blocked-dates', { withCredentials: true });
+        const response = await api.get('/api/admin/blocked-dates');
       setDates(response.data);
     } catch (requestError) {
       setError(requestError.response?.data?.error || 'Failed to load blocked dates.');
@@ -53,7 +53,7 @@ function BlockDates() {
     setError('');
 
     try {
-    await axios.post('/api/admin/block-dates', { date: newDate, reason }, { withCredentials: true });
+    await api.post('/api/admin/block-dates', { date: newDate, reason });
       setReason('');
       await fetchDates();
     } catch (requestError) {
@@ -65,7 +65,7 @@ function BlockDates() {
 
   const handleDelete = async (id) => {
     try {
-    await axios.delete(`/api/admin/block-dates/${id}`, { withCredentials: true });
+    await api.delete(`/api/admin/block-dates/${id}`);
       await fetchDates();
     } catch (requestError) {
       setError(requestError.response?.data?.error || 'Unable to remove blocked date.');

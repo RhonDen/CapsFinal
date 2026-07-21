@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api.js';
 import {
   AlertCircle,
   ArrowLeft,
@@ -53,7 +53,7 @@ function BookingHistory() {
     const sanitizedPhone = phone.replace(/\D/g, '').slice(0, 11);
 
     try {
-      await axios.post('/api/bookings/history/request-otp', { number: sanitizedPhone });
+      await api.post('/api/bookings/history/request-otp', { number: sanitizedPhone });
       setStep(2);
     } catch (requestError) {
       setError(requestError.response?.data?.error || 'Failed to send OTP.');
@@ -74,7 +74,7 @@ function BookingHistory() {
     const sanitizedPhone = phone.replace(/\D/g, '').slice(0, 11);
 
     try {
-      const response = await axios.post('/api/bookings/history/verify-otp', {
+      const response = await api.post('/api/bookings/history/verify-otp', {
         number: sanitizedPhone,
         otp,
       });

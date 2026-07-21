@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../api.js';
 import { BarChart3 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -86,7 +86,7 @@ function DataAnalysis() {
           params = { type: 'monthly', month: selectedMonth, year: selectedYear };
         }
 
-        const response = await axios.get('/api/admin/analytics', { params });
+        const response = await api.get('/api/admin/analytics', { params });
 
         const normalizePie = (arr) => {
           const safe = Array.isArray(arr) ? arr : [];

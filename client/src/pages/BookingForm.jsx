@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api.js';
 import {
   AlertCircle,
   ArrowLeft,
@@ -65,7 +65,7 @@ function BookingForm() {
       setIsDateBlocked(false);
 
       try {
-        const response = await axios.get('/api/bookings/availability', {
+        const response = await api.get('/api/bookings/availability', {
           params: {
             date: form.date,
             service: form.service,
@@ -174,7 +174,7 @@ function BookingForm() {
     };
 
     try {
-      const response = await axios.post('/api/bookings/request-otp', payload);
+      const response = await api.post('/api/bookings/request-otp', payload);
 
       setSuccess(response.data.message);
       setStep(2);
@@ -197,7 +197,7 @@ function BookingForm() {
         otp,
       };
 
-      const response = await axios.post('/api/bookings/verify-otp', payload);
+      const response = await api.post('/api/bookings/verify-otp', payload);
 
       const serialText = response.data.serialNumber
         ? ` Request #${response.data.serialNumber} is now waiting for admin approval.`

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api.js';
 import { useState } from 'react';
 import {
   ArrowRight,
@@ -80,7 +80,7 @@ function LandingPage() {
     setContactStatus({ type: '', message: '' });
 
     try {
-      const response = await axios.post(
+      const response = await api.post(
         '/api/contact/messages',
         contactForm
       );

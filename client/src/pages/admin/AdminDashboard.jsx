@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../api.js';
 import {
   BarChart3,
   CalendarX,
@@ -97,9 +97,7 @@ function AdminDashboard() {
       }
 
       try {
-        const response = await axios.get('/api/admin/dashboard', {
-          withCredentials: true,
-        });
+        const response = await api.get('/api/admin/dashboard');
         setDashboard(response.data);
         setError('');
       } catch (requestError) {
@@ -152,15 +150,9 @@ function AdminDashboard() {
     setError('');
 
     try {
-      await axios.patch(
+      await api.patch(
         `/api/admin/appointments/${numericId}/status`,
-        { status },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          withCredentials: true,
-        }
+        { status }
       );
       await fetchDashboard(false);
     } catch (requestError) {
@@ -174,9 +166,7 @@ function AdminDashboard() {
 
   const fetchDashboard = useMemo(() => {
     return async () => {
-      const response = await axios.get('/api/admin/dashboard', {
-        withCredentials: true,
-      });
+      const response = await api.get('/api/admin/dashboard');
       setDashboard(response.data);
       setError('');
     };

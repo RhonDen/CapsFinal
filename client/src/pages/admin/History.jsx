@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../api.js';
 import { Calendar, Filter, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
@@ -82,7 +82,7 @@ function History() {
 
     try {
       const qs = buildQuery();
-      const response = await axios.get(`/api/admin/history?${qs}`, { withCredentials: true });
+      const response = await api.get(`/api/admin/history?${qs}`);
       setRows(response.data.appointments || []);
     } catch (requestError) {
       setError(requestError.response?.data?.error || 'Failed to load history.');

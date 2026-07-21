@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../api.js';
 import { Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
@@ -24,7 +24,7 @@ function Clients() {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/admin/clients');
+        const response = await api.get('/api/admin/clients');
         setClients(response.data);
       } catch (requestError) {
         setError(requestError.response?.data?.error || 'Failed to load clients.');
