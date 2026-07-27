@@ -1,14 +1,19 @@
-# TODO
+# Analytics Enhancement Plan
 
-## Analytics fixes
-- [x] Fix UniSMS OTP phone validation acceptance (request-otp) to reduce “invalid lije” confusion.
-- [x] Implement strict PH +63 normalization and sender_id retries in `server/utils/sendSMS.js`.
-- [x] Fix weekly/monthly analytics “Appointments by Day” bucket grouping so weekly has exactly 7 weekday buckets and monthly has days for the selected month (`server/routes/admin.js` `/api/admin/analytics`).
-- [x] Add analytics fields to `/api/admin/analytics`: `peakHours` and `predictivePie` for `type=predictive` (`server/routes/admin.js`).
-- [ ] Update frontend analytics page to show Predictive (Next Month) + Peak Hours (`client/src/pages/admin/DataAnalysis.jsx`).
-- [ ] Manual verification via:
-  - [ ] `curl` for `type=daily|weekly|monthly|predictive`
-  - [ ] Switch tabs in admin analytics UI and verify charts render
+## Phase 1 — Bug Fixes ✅
+- [x] Fix line chart X-axis: change `dataKey="day"` to `dataKey="name"` in DataAnalysis.jsx
+- [x] Fix weekday ordering in diagnostics (ensure Mon-Sun order)
 
-## Dev reliability (local)
-- [ ] Ensure `npm run dev` works reliably without missing binaries / port conflicts.
+## Phase 2 — Enhanced Backend Analytics (server/routes/admin.js) ✅
+- [x] Add rejection analysis: rejected + notCompleted counts by service
+- [x] Add status change timeline: pending → accepted → completed/notCompleted over time
+- [x] Add service popularity trend: month-over-month service demand changes
+- [x] Add walk-in vs online booking comparison data
+
+## Phase 3 — Enhanced Frontend (client/src/pages/admin/DataAnalysis.jsx) ✅
+- [x] Add Service × Day Heatmap visualization (colored grid replacing plain table)
+- [x] Add Rejection Analysis section (which services get rejected/not-completed most)
+- [x] ~~Add smarter Prescriptive Analytics with priority scoring~~ **REMOVED per user request**
+- [x] Add Service Popularity Trend chart
+- [x] Add Walk-in vs Online comparison chart
+- [x] Add Status Timeline chart
