@@ -74,6 +74,34 @@ export const formatTimeFromDateValue = (dateValue) => {
   });
 };
 
+/**
+ * Compute end time from the raw time string and duration minutes.
+ * This avoids timezone issues with stored Date objects.
+ * Example: time="12:15", durationMinutes=45 → "1:00 PM"
+ */
+export const computeEndTimeLabel = (time, durationMinutes) => {
+  if (!time || !durationMinutes) {
+    return null;
+  }
+
+  const [hours, minutes] = time.split(':').map(Number);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null;
+  }
+
+  const startTotalMinutes = hours * 60 + minutes;
+  const endTotalMinutes = startTotalMinutes + durationMinutes;
+
+  const endHours = Math.floor(endTotalMinutes / 60);
+  const endMinutes = endTotalMinutes % 60;
+
+  const displayHours = endHours % 12 || 12;
+  const suffix = endHours >= 12 ? 'PM' : 'AM';
+  const pad = (v) => String(v).padStart(2, '0');
+
+  return `${displayHours}:${pad(endMinutes)} ${suffix}`;
+};
+
 export const formatStatusLabel = (status) => {
   if (status === 'accepted') {
     return 'Approved';
@@ -81,6 +109,10 @@ export const formatStatusLabel = (status) => {
 
   if (status === 'notCompleted') {
     return 'Not Completed';
+  }
+
+  if (status === 'cancelled') {
+    return 'Cancelled';
   }
 
   if (!status) {
@@ -109,6 +141,10 @@ export const getStatusTone = (status) => {
 
   if (status === 'notCompleted') {
     return 'bg-slate-200 text-slate-700';
+  }
+
+  if (status === 'cancelled') {
+    return 'bg-red-100 text-red-700';
   }
 
   return 'bg-slate-100 text-slate-700';

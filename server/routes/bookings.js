@@ -295,9 +295,16 @@ router.post(
       otpExpires: new Date(Date.now() + 5 * 60 * 1000),
     });
 
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    // DEV MODE: Log OTP to console for testing when SMS providers are not configured
+    if (isDev) {
+      console.log(`\n🔐 [DEV] Booking OTP for ${normalizedRequestNumber}: ${otp}\n`);
+    }
+
     try {
       await sendSMS(normalizedRequestNumber, `Your Dents-City OTP is ${otp}. Valid for 5 minutes.`);
-      return res.json({ message: 'OTP sent successfully.' });
+      return res.json({ message: 'OTP sent successfully.', ...(isDev ? { devOtp: otp } : {}) });
     } catch (e) {
       console.error('OTP sendSMS error:', {
         message: e?.message,
@@ -427,7 +434,26 @@ router.post(
     }
 
     const { number } = req.body;
-    const count = await Appointment.count({ where: { number, otp: null } });
+
+    // Normalize to E.164 format to match stored numbers (+639XXXXXXXXX)
+    const normalizedNumber = (() => {
+      try {
+        return sendSMS.toE164PhStrict(number);
+      } catch {
+        const digits = String(number || '').replace(/\D/g, '');
+        if (/^09\d{9}$/.test(digits)) {
+          return `+63${digits.slice(1)}`;
+        }
+        if (/^63\d{10}$/.test(digits)) {
+          return `+${digits}`;
+        }
+        return digits;
+      }
+    })();
+
+    // FIX: Check for ANY appointment by phone number, not just otp:null ones.
+    // This allows clients to see history even if their booking OTP hasn't been verified yet.
+    const count = await Appointment.count({ where: { number: normalizedNumber } });
 
     if (count === 0) {
       return res.status(404).json({ error: 'No appointments found for this number.' });
@@ -436,20 +462,28 @@ router.post(
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const salt = await bcrypt.genSalt(10);
     const otpHash = await bcrypt.hash(otp, salt);
-    const latestAppointment = await Appointment.findOne({
-      where: { number, otp: null },
-      order: [['createdAt', 'DESC']],
+
+    // FIX: Store history OTP on a dedicated record instead of modifying the latest appointment.
+    // Use a separate model or store in-memory. For simplicity, we'll use a global Map.
+    // This prevents the history OTP from interfering with the appointment's booking OTP flow.
+    if (!global._historyOtps) {
+      global._historyOtps = new Map();
+    }
+    global._historyOtps.set(normalizedNumber, {
+      otp: otpHash,
+      expires: new Date(Date.now() + 5 * 60 * 1000),
     });
 
-    if (latestAppointment) {
-      latestAppointment.historyOtp = otpHash;
-      latestAppointment.historyOtpExpires = new Date(Date.now() + 5 * 60 * 1000);
-      await latestAppointment.save();
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    // DEV MODE: Log history OTP to console for testing
+    if (isDev) {
+      console.log(`\n🔐 [DEV] History OTP for ${normalizedNumber}: ${otp}\n`);
     }
 
     try {
-      await sendSMS(number, `Your Dents-City history OTP is ${otp}. Valid for 5 minutes.`);
-      return res.json({ message: 'OTP sent to your phone.' });
+      await sendSMS(normalizedNumber, `Your Dents-City history OTP is ${otp}. Valid for 5 minutes.`);
+      return res.json({ message: 'OTP sent to your phone.', ...(isDev ? { devOtp: otp } : {}) });
     } catch {
       return res.status(500).json({ error: 'Failed to send OTP.' });
     }
@@ -472,31 +506,42 @@ router.post(
 
     const { number, otp } = req.body;
 
-    const appointment = await Appointment.findOne({
-      where: {
-        number,
-        historyOtp: { [Op.ne]: null },
-        historyOtpExpires: { [Op.gt]: new Date() },
-      },
-      order: [['createdAt', 'DESC']],
-    });
+    // Normalize to E.164 format to match stored numbers (+639XXXXXXXXX)
+    const normalizedNumber = (() => {
+      try {
+        return sendSMS.toE164PhStrict(number);
+      } catch {
+        const digits = String(number || '').replace(/\D/g, '');
+        if (/^09\d{9}$/.test(digits)) {
+          return `+63${digits.slice(1)}`;
+        }
+        if (/^63\d{10}$/.test(digits)) {
+          return `+${digits}`;
+        }
+        return digits;
+      }
+    })();
 
-    if (!appointment) {
+    // FIX: Check the in-memory Map instead of the appointment record
+    const storedOtpData = global._historyOtps?.get(normalizedNumber);
+
+    if (!storedOtpData || new Date() > storedOtpData.expires) {
       return res.status(400).json({ error: 'No OTP requested or OTP expired.' });
     }
 
-    const valid = await bcrypt.compare(otp, appointment.historyOtp);
+    const valid = await bcrypt.compare(otp, storedOtpData.otp);
 
     if (!valid) {
       return res.status(400).json({ error: 'Invalid OTP.' });
     }
 
-    appointment.historyOtp = null;
-    appointment.historyOtpExpires = null;
-    await appointment.save();
+    // Clear the OTP from memory
+    global._historyOtps.delete(normalizedNumber);
 
+    // FIX: Return ALL appointments for this number, not just otp:null ones.
+    // This ensures clients can see all their appointments including pending ones.
     const appointments = await Appointment.findAll({
-      where: { number, otp: null },
+      where: { number: normalizedNumber },
       order: [['scheduledStart', 'DESC'], ['createdAt', 'DESC']],
       attributes: { exclude: ['otp', 'otpExpires', 'historyOtp', 'historyOtpExpires'] },
     });
@@ -510,6 +555,74 @@ router.post(
           blocksTimeSlot: isBlockingStatus(data.status),
         };
       }),
+    });
+  })
+);
+
+router.post(
+  '/cancel',
+  [
+    body('number').trim().notEmpty().withMessage('Phone number is required.'),
+    body('appointmentId').isInt({ min: 1 }).withMessage('Valid appointment ID is required.'),
+  ],
+  asyncHandler(async (req, res) => {
+    if (!validate(req, res)) {
+      return;
+    }
+
+    const { number, appointmentId } = req.body;
+
+    // Normalize phone number
+    const normalizedNumber = (() => {
+      try {
+        return sendSMS.toE164PhStrict(number);
+      } catch {
+        const digits = String(number || '').replace(/\D/g, '');
+        if (/^09\d{9}$/.test(digits)) return `+63${digits.slice(1)}`;
+        if (/^63\d{10}$/.test(digits)) return `+${digits}`;
+        return digits;
+      }
+    })();
+
+    // Find the appointment
+    const appointment = await Appointment.findOne({
+      where: {
+        id: appointmentId,
+        number: normalizedNumber,
+      },
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found.' });
+    }
+
+    // Only allow cancelling pending or accepted appointments
+    if (appointment.status !== 'pending' && appointment.status !== 'accepted') {
+      return res.status(400).json({
+        error: `Cannot cancel an appointment with status "${appointment.status}". Only pending or approved appointments can be cancelled.`,
+      });
+    }
+
+    // Update status to cancelled
+    appointment.status = 'cancelled';
+    await appointment.save();
+
+    // Send SMS notification
+    try {
+      const dateStr = appointment.dateKey || appointment.date?.toISOString().slice(0, 10) || 'unknown date';
+      const timeStr = appointment.time || 'unknown time';
+      await sendSMS(
+        normalizedNumber,
+        `Your Dents-City appointment on ${dateStr} at ${timeStr} has been cancelled.`
+      );
+    } catch {
+      // SMS failure shouldn't block the cancellation
+      console.warn('Cancel SMS notification failed for', normalizedNumber);
+    }
+
+    return res.json({
+      message: 'Appointment cancelled successfully.',
+      appointmentId: appointment.id,
     });
   })
 );

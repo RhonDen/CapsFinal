@@ -1,4 +1,4 @@
-import api from '../api.js';
+ import api from '../api.js';
 import {
   AlertCircle,
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Smartphone,
   Sparkles,
+  XCircle,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -35,6 +36,8 @@ function BookingHistory() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cancellingId, setCancellingId] = useState(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(null);
 
   const handlePhoneChange = (event) => {
     const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 11);
@@ -92,6 +95,34 @@ function BookingHistory() {
     setError('');
     setOtp('');
     setStep(1);
+  };
+
+  const handleCancelAppointment = async (appointment) => {
+    setCancellingId(appointment.id || appointment._id);
+    setError('');
+    setShowCancelConfirm(null);
+
+    try {
+      const sanitizedPhone = phone.replace(/\D/g, '').slice(0, 11);
+      await api.post('/api/bookings/cancel', {
+        number: sanitizedPhone,
+        appointmentId: appointment.id || appointment._id,
+      });
+
+      // Update the appointment status locally
+      setAppointments((prev) =>
+        prev.map((a) => {
+          if ((a.id || a._id) === (appointment.id || appointment._id)) {
+            return { ...a, status: 'cancelled' };
+          }
+          return a;
+        })
+      );
+    } catch (cancelError) {
+      setError(cancelError.response?.data?.error || 'Failed to cancel appointment.');
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   const groupedAppointments = useMemo(() => {
@@ -175,10 +206,10 @@ function BookingHistory() {
             Appointment timeline
           </div>
           <h2 className="mt-3 text-3xl font-semibold text-maastricht sm:text-4xl">
-            Your dental appointment history
+            Appointment history & cancellation
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-police md:text-base">
-            Review every booking in one calm view. The timeline below groups appointments by date and keeps status visible at a glance.
+            Review every booking or cancel a pending/approved appointment. The timeline below groups appointments by date and keeps status visible at a glance.
           </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -315,6 +346,60 @@ function BookingHistory() {
                         </span>
                       </div>
 
+                      {(appointment.status === 'pending' || appointment.status === 'accepted') && (
+                        <div className="mt-4 border-t border-slate-100 pt-4">
+                          <p className="mb-2 text-xs font-medium text-slate-400">
+                            Need to cancel? You can cancel this appointment here.
+                          </p>
+                          <button
+                            onClick={() => setShowCancelConfirm(appointment)}
+                            disabled={cancellingId === (appointment.id || appointment._id)}
+                            className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {cancellingId === (appointment.id || appointment._id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <XCircle className="h-4 w-4" />
+                            )}
+                            Cancel this Appointment
+                          </button>
+                        </div>
+                      )}
+
+                      {showCancelConfirm && (showCancelConfirm.id || showCancelConfirm._id) === (appointment.id || appointment._id) && (
+                        <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-4">
+                          <p className="text-sm font-medium text-red-800">
+                            Are you sure you want to cancel your {formatServiceLabel(appointment.service)} appointment on{' '}
+                            {formatDateKey(appointment.dateKey || appointment.date, {
+                              weekday: 'long',
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}{' '}
+                            at {formatTimeLabel(appointment.time)}?
+                          </p>
+                          <p className="mt-2 text-xs text-red-600">This action cannot be undone.</p>
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              onClick={() => handleCancelAppointment(appointment)}
+                              disabled={cancellingId === (appointment.id || appointment._id)}
+                              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {cancellingId === (appointment.id || appointment._id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : null}
+                              Yes, Cancel it
+                            </button>
+                            <button
+                              onClick={() => setShowCancelConfirm(null)}
+                              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                            >
+                              Keep it
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="mt-4 grid gap-3 md:grid-cols-3">
                         <div className="rounded-2xl bg-slate-50 p-3">
                           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-silver-lake">Time</p>
@@ -344,7 +429,7 @@ function BookingHistory() {
 
         {appointments.length === 0 && step === 1 ? (
           <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50/70 p-6 text-sm text-police">
-            Once you verify your number, your past appointments will appear here grouped by date and status.
+            Once you verify your number, your past appointments will appear here grouped by date and status. You can also cancel pending or approved appointments from this page.
           </div>
         ) : null}
       </div>

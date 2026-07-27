@@ -2,8 +2,8 @@ import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import Footer from './components/Footer.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import PublicNavbar from './components/PublicNavbar.jsx';
 import ScreenLoader from './components/ScreenLoader.jsx';
-
 
 const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
 const BlankProbe = lazy(() => import('./pages/BlankProbe.jsx'));
@@ -23,13 +23,13 @@ function AppRoutes() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      {!isAdminRoute && <PublicNavbar />}
       <main className="flex-grow">
         <Suspense
           fallback={<ScreenLoader title="Loading site…" subtitle="Preparing the next page" />}
         >
-          {/* Keyed wrapper: animates any top-level route change */}
           <div key={location.pathname} className="animate-panel-in">
-              <Routes>
+            <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/booking/*" element={<BookingRouter />} />
               <Route path="/admin/login" element={<AdminLogin />} />
@@ -107,4 +107,3 @@ function App() {
 }
 
 export default App;
-

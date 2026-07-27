@@ -42,6 +42,7 @@ const STATUS_LABELS = {
   rejected: 'Rejected',
   completed: 'Completed',
   notCompleted: 'Not Completed',
+  cancelled: 'Cancelled',
 };
 
 const asyncHandler = (handler) => (req, res, next) =>
@@ -259,6 +260,10 @@ router.get(
 
     const todaySelector = buildDateSelector(todayDateKey);
 
+    // Compute start of tomorrow to separate today's appointments from upcoming (future dates only)
+    const todayStart = normalizeDateOnly(now);
+    const startOfTomorrow = todayStart ? new Date(todayStart.getTime() + 24 * 60 * 60 * 1000) : new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
     const [pendingAppointments, todayAppointments, upcomingAppointments] = await Promise.all([
       Appointment.findAll(
         { where: { status: 'pending', otp: null }, order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']] }
@@ -266,20 +271,33 @@ router.get(
       Appointment.findAll({
         where: {
           ...(todaySelector || {}),
-          status: { [Op.in]: ['accepted', 'rejected', 'completed', 'notCompleted'] },
+          status: { [Op.in]: ['accepted', 'rejected', 'completed', 'notCompleted', 'cancelled'] },
           time: { [Op.ne]: null },
         },
         order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']],
       }),
-      // Upcoming: next closest scheduled appointments (approved-only), starting from now.
+      // Upcoming: future dates only (tomorrow onwards), excluding today's appointments.
+      // Also includes records that have scheduledStart OR have a dateKey >= tomorrow
+      // OR have a raw date field >= tomorrow (for walk-ins that may not have scheduledStart or dateKey set).
       Appointment.findAll({
         where: {
-          status: { [Op.in]: ['accepted', 'rejected', 'completed', 'notCompleted'] },
+          status: { [Op.in]: ['accepted', 'rejected', 'completed', 'notCompleted', 'cancelled'] },
           time: { [Op.ne]: null },
-          scheduledStart: { [Op.gte]: now },
           otp: null,
+          [Op.or]: [
+            { scheduledStart: { [Op.gte]: startOfTomorrow } },
+            {
+              scheduledStart: null,
+              dateKey: { [Op.gte]: dateKeyFromDateValue(startOfTomorrow) }
+            },
+            {
+              scheduledStart: null,
+              dateKey: null,
+              date: { [Op.gte]: startOfTomorrow }
+            },
+          ],
         },
-        order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']],
+        order: [['scheduledStart', 'ASC'], ['dateKey', 'ASC'], ['date', 'ASC'], ['time', 'ASC'], ['createdAt', 'ASC']],
         limit: 12,
       }),
     ]);
@@ -323,45 +341,67 @@ router.get(
   [
     query('from').optional().isISO8601().withMessage('Invalid from date.'),
     query('to').optional().isISO8601().withMessage('Invalid to date.'),
-    query('status').optional().isIn(['pending', 'accepted', 'rejected', 'completed', 'notCompleted']).withMessage('Invalid status.'),
+    query('status').optional().isIn(['pending', 'accepted', 'rejected', 'completed', 'notCompleted', 'cancelled']).withMessage('Invalid status.'),
     query('phone').optional().isString().withMessage('Invalid phone.'),
+    query('search').optional().isString().withMessage('Invalid search.'),
   ],
   asyncHandler(async (req, res) => {
     if (!validate(req, res)) {
       return;
     }
 
-    const { from, to, status, phone } = req.query;
+    const { from, to, status, phone, search } = req.query;
 
+    // ── SEARCH MODE ──
+    // If search text is provided, ignore date filters and search ALL records.
+    if (search && search.trim()) {
+      const q = search.trim();
+      const digits = q.replace(/\D/g, '');
+
+      const allRows = await Appointment.findAll({
+        where: { otp: null },
+        order: [['scheduledStart', 'DESC'], ['createdAt', 'DESC']],
+      });
+
+      // Client-side filter by name or phone
+      const matched = allRows.filter((r) => {
+        const obj = r.get ? r.get({ plain: true }) : r;
+        const name = [obj.firstName, obj.lastName, obj.middleInitial]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        const number = String(obj.number || '').toLowerCase();
+        if (digits) return number.replace(/\D/g, '').includes(digits) || name.includes(q);
+        return name.includes(q) || number.includes(q);
+      });
+
+      return res.json({
+        appointments: matched.map(serializeAppointment),
+      });
+    }
+
+    // ── NORMAL FILTER MODE ──
     const digitsOnlyPhone = phone ? String(phone).replace(/\D/g, '').trim() : '';
     const phoneToMatch = digitsOnlyPhone ? digitsOnlyPhone.slice(0, 11) : '';
 
-    // Normalize date range:
-    // - 'to' is treated as inclusive day, so we use endExclusive = startOfNextDay.
     const fromDate = from ? new Date(from) : null;
     const toDate = to ? new Date(to) : null;
 
     const dateKeyFrom = fromDate ? dateKeyFromDateValue(fromDate) : null;
     const dateKeyTo = toDate ? dateKeyFromDateValue(toDate) : null;
 
-    // If dateKeyFrom/dateKeyTo fail, fall back to scheduledStart/date filtering in a safe way.
-    // Primary filtering uses dateKey (YYYY-MM-DD lexical range works).
     const where = {
       otp: null,
     };
 
-    // History should only include "outcomes" by default:
-    // - completed
-    // - notCompleted
-    // If the admin explicitly selects a status filter, respect it.
     if (status) {
       where.status = status;
     } else {
-      where.status = { [Op.in]: ['completed', 'notCompleted'] };
+      // Show ALL finalized statuses including accepted (walk-ins) and cancelled
+      where.status = { [Op.in]: ['completed', 'notCompleted', 'cancelled', 'accepted', 'rejected'] };
     }
 
     if (phoneToMatch) {
-      // Exact match on the stored number (after client strips non-digits).
       where.number = phoneToMatch;
     }
 
@@ -373,8 +413,6 @@ router.get(
     } else if (fromDate || toDate) {
       const start = fromDate ? new Date(fromDate) : new Date('1970-01-01T00:00:00.000Z');
       const endExclusive = toDate ? new Date(toDate) : new Date('2999-12-31T00:00:00.000Z');
-
-      // Make endExclusive inclusive of the whole day.
       endExclusive.setDate(endExclusive.getDate() + 1);
 
       where[Op.and] = [
@@ -411,7 +449,7 @@ router.patch(
       .matches(/^\d+$/)
       .withMessage('Invalid appointment ID.'),
     body('status')
-      .isIn(['accepted', 'rejected', 'completed', 'notCompleted'])
+      .isIn(['accepted', 'rejected', 'completed', 'notCompleted', 'cancelled'])
       .withMessage('Invalid appointment status.'),
   ],
   asyncHandler(async (req, res) => {
@@ -492,7 +530,7 @@ router.patch(
     const statusSmsBuilders = {
       accepted: (entry) => {
         const name = formatName(entry);
-        return `Knorkubs, Liuh F Your booking has been approved for Dents-City. Date: ${entry.dateKey}, Time: ${formatTimeLabel(
+        return `${name}, your booking has been approved for Dents-City. Date: ${entry.dateKey}, Time: ${formatTimeLabel(
           entry.time
         )}. Thank you.`;
       },
@@ -587,349 +625,540 @@ router.get(
   '/clients',
   auth,
   asyncHandler(async (req, res) => {
-    // Build clients list by fetching appointments and reducing in JS
-    const rows = await Appointment.findAll({ where: { otp: null } });
-    const map = new Map();
-
-    rows.forEach((r) => {
-      const obj = r.get ? r.get({ plain: true }) : r;
-      const appointmentDateTime = obj.scheduledStart || obj.date || obj.createdAt;
-
-      const prev = map.get(obj.number);
-      if (!prev || appointmentDateTime > prev.lastAppointment) {
-        map.set(obj.number, {
-          number: obj.number,
-          lastAppointment: appointmentDateTime,
-          firstName: obj.firstName,
-          lastName: obj.lastName,
-          middleInitial: obj.middleInitial,
+    const allAppts = await Appointment.findAll({
+      where: { status: { [Op.in]: ANALYTICS_STATUSES } },
+      raw: true,
+      order: [['scheduledStart', 'DESC'], ['id', 'DESC']]
+    });
+    
+    const clientMap = new Map();
+    for (const a of allAppts) {
+      const phone = a.number || '';
+      const cleaned = phone.replace(/\D/g, '');
+      if (!cleaned || cleaned.length < 10) continue;
+      const key = cleaned.slice(-10);
+      const displayName = [a.firstName, a.lastName].filter(Boolean).join(' ') || 'Unknown';
+      
+      if (!clientMap.has(key)) {
+        clientMap.set(key, { 
+          number: a.number,
+          fullName: displayName,
+          allNames: new Set(),
+          lastAppointment: a.scheduledStart || a.date || a.createdAt,
+          appointmentCount: 0,
         });
       }
-    });
+      const entry = clientMap.get(key);
+      entry.appointmentCount++;
+      // Collect all unique names for this number
+      if (displayName && displayName !== 'Unknown') {
+        entry.allNames.add(displayName);
+      }
+      // Track latest appointment date
+      const apptDate = a.scheduledStart || a.date || a.createdAt;
+      if (apptDate && (!entry.lastAppointment || new Date(apptDate) > new Date(entry.lastAppointment))) {
+        entry.lastAppointment = apptDate;
+      }
+    }
 
-    const clients = Array.from(map.values()).map((c) => ({
-      number: c.number,
-      lastAppointment: c.lastAppointment,
-      firstName: c.firstName || '',
-      lastName: c.lastName || '',
-      middleInitial: c.middleInitial || '',
-      fullName: [c.lastName, c.firstName, c.middleInitial].filter(Boolean).join(', '),
-    }));
-
-    clients.sort((a, b) => new Date(b.lastAppointment) - new Date(a.lastAppointment));
+    const clients = Array.from(clientMap.values())
+      .map(c => ({
+        ...c,
+        allNames: Array.from(c.allNames).sort(),
+      }))
+      .sort((a, b) => b.appointmentCount - a.appointmentCount);
+    
     res.json(clients);
   })
 );
 
+// ── Client Appointments Endpoint ──
+router.get(
+  '/clients/:number/appointments',
+  auth,
+  asyncHandler(async (req, res) => {
+    const rawNumber = req.params.number;
+    const cleaned = rawNumber.replace(/\D/g, '');
+    
+    // Find all appointments matching this phone number (normalize both sides)
+    const where = cleaned ? {
+      [Op.or]: [
+        { number: rawNumber },
+        { number: { [Op.like]: `%${cleaned.slice(-10)}%` } },
+      ]
+    } : { number: rawNumber };
+
+    const appointments = await Appointment.findAll({
+      where,
+      order: [['scheduledStart', 'DESC'], ['createdAt', 'DESC']],
+    });
+
+    res.json({
+      appointments: appointments.map(a => {
+        const data = a.get ? a.get({ plain: true }) : a;
+        const displayName = [data.firstName, data.lastName].filter(Boolean).join(' ') || 'Unknown';
+        return {
+          ...data,
+          fullName: displayName,
+          dateKey: data.dateKey || dateKeyFromDateValue(data.date),
+        };
+      }),
+    });
+  })
+);
+
+// ── Walk-in Route ──────────────────────────────────────────────────────
 router.post(
   '/walk-in',
   auth,
-  [
-    body('number')
-      .trim()
-      .matches(/^09\d{9}$/)
-      .withMessage('Invalid phone number'),
-    body('lastName').trim().notEmpty().withMessage('Last name is required.'),
-    body('firstName').trim().notEmpty().withMessage('First name is required.'),
-    body('middleInitial')
-      .optional({ values: 'falsy' })
-      .trim()
-      .isLength({ max: 1 })
-      .withMessage('Middle initial must be one character only.'),
-    body('service')
-      .trim()
-      .isIn(ALLOWED_SERVICES)
-      .withMessage('Invalid service selected.'),
-    body('email')
-      .optional({ values: 'falsy' })
-      .trim()
-      .isEmail()
-      .withMessage('Invalid email address.'),
-    body('notes').optional({ values: 'falsy' }).trim(),
-    body('date').isISO8601().withMessage('A valid appointment date is required.'),
-    body('time')
-      .trim()
-      .matches(/^([01]\d|2[0-3]):([0-5]\d)$/)
-      .withMessage('A valid appointment time is required.'),
-  ],
   asyncHandler(async (req, res) => {
-    if (!validate(req, res)) {
-      return;
+    const { number, lastName, firstName, middleInitial, service, date, time, email, notes } = req.body;
+    
+    // Only require essential fields — email, notes, middleInitial are optional
+    if (!number || !lastName || !firstName || !service || !date || !time) {
+      return res.status(400).json({ error: 'Required fields: phone number, last name, first name, service, date, and time.' });
     }
 
-    const { number, lastName, firstName, middleInitial, service, email, notes, date, time } =
-      req.body;
+    const raw = String(number).replace(/\D/g, '');
+    let e164phone;
+    if (/^63\d{10}$/.test(raw)) e164phone = '+' + raw;
+    else if (/^09\d{9}$/.test(raw)) e164phone = '+63' + raw.slice(1);
+    else if (/^9\d{9}$/.test(raw)) e164phone = '+63' + raw;
+    else {
+      // Try E.164 normalization via sendSMS utility
+      try {
+        e164phone = sendSMS.toE164PhStrict(number);
+      } catch {
+        e164phone = number;
+      }
+    }
 
+    // Build schedule so the appointment gets proper scheduledStart/scheduledEnd/dateKey/durationMinutes
     const schedule = buildSchedule({ dateValue: date, time, service });
 
-    if (!schedule) {
-      return res.status(400).json({
-        error: 'Appointment time must be within clinic hours and follow 15-minute slots.',
-      });
+    // Use the dateValue from schedule, but fallback to the raw input
+    let dateToUse, dateKeyToUse;
+    if (schedule) {
+      dateToUse = schedule.date;
+      dateKeyToUse = schedule.dateKey;
+    } else {
+      // If buildSchedule fails (e.g. time outside business hours), 
+      // manually compute dateKey from the input date
+      dateToUse = normalizeDateOnly(date);
+      dateKeyToUse = dateKeyFromDateValue(date);
     }
 
-    const blockedDate = await findBlockedDate(schedule.dateKey);
-
-    if (blockedDate) {
-      return res.status(400).json({ error: 'Selected date is blocked.' });
-    }
-
-    const conflictingAppointment = await findConflictingAppointment(schedule);
-
-    if (conflictingAppointment) {
-      return res.status(400).json({
-        error: 'Selected time is no longer available for that date.',
-      });
-    }
-
-    const appointment = new Appointment({
-      serialNumber: await getNextSerialNumber('appointmentSerial'),
-      number,
+    const appointment = await Appointment.create({
+      number: e164phone,
       lastName,
       firstName,
       middleInitial: middleInitial || '',
       service,
       email: email || '',
       notes: notes || '',
-      date: schedule.date,
-      dateKey: schedule.dateKey,
-      time: schedule.time,
-      durationMinutes: schedule.durationMinutes,
-      scheduledStart: schedule.scheduledStart,
-      scheduledEnd: schedule.scheduledEnd,
-      verifiedAt: new Date(),
+      date: dateToUse || date,
+      dateKey: dateKeyToUse || null,
+      time: schedule?.time || time,
+      durationMinutes: schedule?.durationMinutes || null,
+      scheduledStart: schedule?.scheduledStart || null,
+      scheduledEnd: schedule?.scheduledEnd || null,
       status: 'accepted',
       isWalkIn: true,
     });
 
-    await appointment.save();
-    return res.status(201).json({
+    res.status(201).json({
       message: 'Walk-in appointment created.',
-      appointment: serializeAppointment(appointment),
+      appointment: appointment.get({ plain: true }),
     });
   })
 );
 
+// ── Helpers ─────────────────────────────────────────────────────────────
+const toAppointmentDate = (obj) => {
+  if (!obj) return null;
+  // Try date field (string like "2026-06-26 16:00:00.000 +00:00")
+  if (obj.date) {
+    const d = new Date(obj.date);
+    if (!isNaN(d.getTime())) return d;
+  }
+  // Try scheduledStart field
+  if (obj.scheduledStart) {
+    const d = new Date(obj.scheduledStart);
+    if (!isNaN(d.getTime())) return d;
+  }
+  // Try createdAt as fallback
+  if (obj.createdAt) {
+    const d = new Date(obj.createdAt);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+};
+
+const ANALYTICS_STATUSES = ['completed', 'notCompleted', 'accepted', 'rejected', 'cancelled'];
+
+// ── Analytics Endpoint ──────────────────────────────────────────────────
 router.get(
   '/analytics',
   auth,
-  [
-    query('type')
-      .optional()
-      .isIn(['daily', 'weekly', 'monthly', 'predictive'])
-      .withMessage('Analysis type must be daily, weekly, monthly, or predictive.'),
-    query('month')
-      .optional()
-      .isInt({ min: 1, max: 12 })
-      .withMessage('Month must be between 1 and 12.'),
-    query('year')
-      .optional()
-      .isInt({ min: 2000, max: 9999 })
-      .withMessage('Year must be a valid positive number.'),
-    query('date')
-      .optional()
-      .isISO8601()
-      .withMessage('Date must be a valid ISO8601 date.'),
-  ],
   asyncHandler(async (req, res) => {
-    if (!validate(req, res)) {
-      return;
-    }
-
+    const { type: analysisType, date, month, year } = req.query;
     const now = new Date();
-    const analysisType = req.query.type || 'monthly';
+    now.setHours(0, 0, 0, 0);
 
-    const toAppointmentDate = (obj) => {
-      const raw = obj?.scheduledStart || obj?.date || obj?.createdAt;
-      const d = raw ? new Date(raw) : null;
-      return d && !Number.isNaN(d.getTime()) ? d : null;
-    };
-
-    const getPredictiveTargetMonth = () => {
-      const year = req.query.year ? Number.parseInt(req.query.year, 10) : now.getFullYear();
-      const monthBase = req.query.month ? Number.parseInt(req.query.month, 10) : now.getMonth() + 1; // selected month
-      const next = monthBase + 1; // next month
-      let y = year;
-      let m = next;
-      if (m > 12) {
-        m = 1;
-        y += 1;
-      }
-      return { year: y, month: m };
-    };
-
-    const computeRange = () => {
-      if (analysisType === 'daily') {
-        const dk = req.query.date || dateKeyFromDateValue(now);
-        const dayRange = getDayRange(dk);
-        if (!dayRange) return { start: null, end: null, dateKey: dk };
-        return { start: dayRange.start, end: dayRange.end, dateKey: dk };
-      }
-
-      if (analysisType === 'weekly') {
-        const dk = req.query.date || dateKeyFromDateValue(now);
-        const [y, m, d] = dk.split('-').map(Number);
-        const dt = new Date(y, m - 1, d);
-
-        // Mon..Sun week
-        const jsDay = dt.getDay(); // 0 Sun .. 6 Sat
-        const mondayOffset = (jsDay + 6) % 7; // Mon=0
-        const firstDay = new Date(dt);
-        firstDay.setDate(dt.getDate() - mondayOffset);
-        firstDay.setHours(0, 0, 0, 0);
-
-        const nextMondayExclusive = new Date(firstDay);
-        nextMondayExclusive.setDate(firstDay.getDate() + 7);
-        nextMondayExclusive.setHours(0, 0, 0, 0);
-
-        return { start: firstDay, end: nextMondayExclusive, dateKey: dk };
-      }
-
-      if (analysisType === 'monthly') {
-        const y = req.query.year ? Number.parseInt(req.query.year, 10) : now.getFullYear();
-        const m = req.query.month ? Number.parseInt(req.query.month, 10) : now.getMonth() + 1;
-        const dateKey = `${y}-${String(m).padStart(2, '0')}-01`;
-        return { start: new Date(y, m - 1, 1, 0, 0, 0, 0), end: new Date(y, m, 1, 0, 0, 0, 0), dateKey };
-      }
-
-      // predictive (next month of selected month/year)
-      const { year: ty, month: tm } = getPredictiveTargetMonth();
-      const dateKey = `${ty}-${String(tm).padStart(2, '0')}-01`;
-      return { start: new Date(ty, tm - 1, 1, 0, 0, 0, 0), end: new Date(ty, tm, 1, 0, 0, 0, 0), dateKey };
-    };
-
-    const { start, end, dateKey } = computeRange();
-    if (!start || !end) {
-      return res.status(400).json({ error: 'Invalid range.' });
+    let start, end;
+    if (analysisType === 'daily') {
+      const d = date ? new Date(date) : new Date(now);
+      d.setHours(0, 0, 0, 0);
+      start = new Date(d);
+      end = new Date(d);
+      end.setDate(end.getDate() + 1);
+    } else if (analysisType === 'weekly') {
+      const d = date ? new Date(date) : new Date(now);
+      const dayOfWeek = d.getDay();
+      const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      start = new Date(d.getFullYear(), d.getMonth(), diff);
+      end = new Date(start);
+      end.setDate(end.getDate() + 7);
+    } else if (analysisType === 'monthly' || analysisType === 'predictive') {
+      const m = month !== undefined ? parseInt(month) - 1 : now.getMonth();
+      const y = year !== undefined ? parseInt(year) : now.getFullYear();
+      start = new Date(y, m, 1);
+      end = new Date(y, m + 1, 1);
+    } else if (analysisType === 'yearly') {
+      const y = year !== undefined ? parseInt(year) : now.getFullYear();
+      start = new Date(y, 0, 1);
+      end = new Date(y + 1, 0, 1);
+    } else {
+      return res.status(400).json({ error: 'Invalid type. Use daily, weekly, monthly, or yearly.' });
     }
 
-    const rows = await Appointment.findAll({ where: { otp: null } });
+    const rows = await Appointment.findAll({ where: { status: { [Op.in]: ANALYTICS_STATUSES } }, raw: true });
 
     const appointmentsInRange = rows
-      .map((r) => (r.get ? r.get({ plain: true }) : r))
       .map((obj) => ({ obj, dt: toAppointmentDate(obj) }))
       .filter((x) => x.dt && x.dt >= start && x.dt < end);
 
-    const pieMap = new Map(); // completed by service
-    const lineMap = new Map(); // day buckets for chart
-    const barMap = new Map(); // status distribution
-    const peakHourMap = new Map(); // 0..23
+    // ── 1. DESCRIPTIVE ANALYTICS (What happened?) ──
+    const pieMap = new Map();
+    const lineMap = new Map();
+    const barMap = new Map();
+    const peakHourMap = new Map();
 
-    // Seed buckets so weekly/monthly sums/axes are consistent
-    if (analysisType === 'weekly') {
-      ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach((b) => lineMap.set(b, 0));
+    if (analysisType === 'yearly') {
+      ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].forEach(m => lineMap.set(m, 0));
+    } else if (analysisType === 'weekly') {
+      ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(b => lineMap.set(b, 0));
     } else if (analysisType === 'monthly' || analysisType === 'predictive') {
       const y = start.getFullYear();
       const m0 = start.getMonth();
-      const daysInMonth = new Date(y, m0 + 1, 0).getDate();
-      for (let d = 1; d <= daysInMonth; d += 1) lineMap.set(String(d), 0);
-    } else if (analysisType === 'daily') {
+      const dim = new Date(y, m0+1, 0).getDate();
+      for (let d = 1; d <= dim; d++) lineMap.set(String(d), 0);
+    } else {
       lineMap.set('Total', 0);
     }
 
-    const weekdayMonFirst = (d) => {
-      const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const lab = labels[d.getDay()];
-      const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return order.includes(lab) ? lab : 'Sun';
-    };
+    for (const { obj, dt } of appointmentsInRange) {
+      const svc = obj.service || 'Unknown';
+      pieMap.set(svc, (pieMap.get(svc) || 0) + 1);
 
-    appointmentsInRange.forEach(({ obj, dt }) => {
-      if (obj.status === 'completed') {
-        pieMap.set(obj.service, (pieMap.get(obj.service) || 0) + 1);
-      }
-
-      if (analysisType === 'daily') {
+      if (analysisType === 'yearly') {
+        const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        lineMap.set(monthNames[dt.getMonth()], (lineMap.get(monthNames[dt.getMonth()]) || 0) + 1);
+      } else if (lineMap.size === 1 && lineMap.has('Total')) {
         lineMap.set('Total', (lineMap.get('Total') || 0) + 1);
       } else if (analysisType === 'weekly') {
-        const label = weekdayMonFirst(dt);
-        lineMap.set(label, (lineMap.get(label) || 0) + 1);
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        lineMap.set(dayNames[dt.getDay()], (lineMap.get(dayNames[dt.getDay()]) || 0) + 1);
       } else {
         lineMap.set(String(dt.getDate()), (lineMap.get(String(dt.getDate())) || 0) + 1);
       }
 
-      barMap.set(obj.status, (barMap.get(obj.status) || 0) + 1);
+      const status = obj.status || 'unknown';
+      barMap.set(status, (barMap.get(status) || 0) + 1);
 
-      const hour = dt.getHours();
-      peakHourMap.set(hour, (peakHourMap.get(hour) || 0) + 1);
-    });
-
-    const pie = Array.from(pieMap.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
-
-    const line = Array.from(lineMap.entries())
-      .map(([day, count]) => ({ day, count }))
-      .sort((a, b) => {
-        if (analysisType === 'weekly') {
-          const order = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
-          return (order[a.day] || 0) - (order[b.day] || 0);
-        }
-        if (analysisType === 'daily') return 0;
-        return Number(a.day) - Number(b.day);
-      });
-
-    const bar = Array.from(barMap.entries()).map(([status, count]) => ({ status, count }));
-
-    const peakHours = Array.from(peakHourMap.entries())
-      .map(([hour, count]) => ({ hour, count }))
-      .sort((a, b) => b.count - a.count || a.hour - b.hour)
-      .slice(0, 6);
-
-    let predictivePie = undefined;
-
-    if (analysisType === 'predictive') {
-      // forecast next month totals using previous 28 days completed average per service
-      const { year: ty, month: tm } = getPredictiveTargetMonth();
-      const targetStart = new Date(ty, tm - 1, 1, 0, 0, 0, 0);
-      const targetEnd = new Date(ty, tm, 1, 0, 0, 0, 0);
-
-      const histEnd = new Date(targetStart);
-      const histStart = new Date(targetStart);
-      histStart.setDate(histStart.getDate() - 28);
-
-      const completedHistory = rows
-        .map((r) => (r.get ? r.get({ plain: true }) : r))
-        .map((obj) => ({ obj, dt: toAppointmentDate(obj) }))
-        .filter((x) => x.dt && x.dt >= histStart && x.dt < histEnd && x.obj?.status === 'completed');
-
-      const daysTarget = Math.max(
-        1,
-        Math.round((targetEnd.getTime() - targetStart.getTime()) / (24 * 60 * 60 * 1000))
-      );
-      const scale = daysTarget / 28;
-
-      const totals28 = new Map();
-      completedHistory.forEach(({ obj }) => {
-        totals28.set(obj.service, (totals28.get(obj.service) || 0) + 1);
-      });
-
-      predictivePie = Array.from(totals28.entries())
-        .map(([service, total28]) => ({
-          name: service,
-          value: Math.max(0, Math.round(total28 * scale)),
-        }))
-        .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
-
-      // include all known services
-      if (Array.isArray(ALLOWED_SERVICES)) {
-        ALLOWED_SERVICES.forEach((s) => {
-          if (!predictivePie.some((x) => x.name === s)) predictivePie.push({ name: s, value: 0 });
-        });
-        predictivePie.sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+      if (obj.time) {
+        const hour = obj.time.split(':')[0];
+        peakHourMap.set(hour, (peakHourMap.get(hour) || 0) + 1);
       }
     }
 
+    const pie = Array.from(pieMap.entries()).map(([name, value]) => ({ name, value }));
+    const line = Array.from(lineMap.entries()).map(([name, count]) => ({ name, count }));
+    const bar = Array.from(barMap.entries()).map(([name, count]) => ({ name, count }));
+    const peakHours = Array.from(peakHourMap.entries())
+      .map(([hour, count]) => ({ hour: hour + ':00', count }))
+      .sort((a, b) => parseInt(a.hour) - parseInt(b.hour));
+
+    // ── 2. DIAGNOSTIC ANALYTICS (Why did it happen?) ──
+    const dowMap = new Map();
+    const serviceDowMap = new Map();
+    for (const { obj, dt } of appointmentsInRange) {
+      const dow = dt.toLocaleDateString('en-US', { weekday: 'long' });
+      dowMap.set(dow, (dowMap.get(dow) || 0) + 1);
+      const svc = obj.service || 'Unknown';
+      const key = svc + '|' + dow;
+      serviceDowMap.set(key, (serviceDowMap.get(key) || 0) + 1);
+    }
+    const dayOfWeekBreakdown = Array.from(dowMap.entries())
+      .map(([day, count]) => ({ day, count }))
+      .sort((a, b) => {
+        const order = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+        return order.indexOf(a.day) - order.indexOf(b.day);
+      });
+
+    const serviceDowCorrelation = [];
+    for (const [key, count] of serviceDowMap) {
+      const [svc, day] = key.split('|');
+      serviceDowCorrelation.push({ service: svc, day, count });
+    }
+
+    // ── 3. PREDICTIVE ANALYTICS (What might happen?) ──
+    let predictiveForecast = [];
+    if (analysisType === 'monthly') {
+      const threeMonthsAgo = new Date(start);
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      const historicalRows = rows
+        .map((obj) => ({ obj, dt: toAppointmentDate(obj) }))
+        .filter((x) => x.dt && x.dt >= threeMonthsAgo && x.dt < start);
+
+      const monthlyCounts = new Map();
+      for (const { dt } of historicalRows) {
+        const key = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2, '0');
+        monthlyCounts.set(key, (monthlyCounts.get(key) || 0) + 1);
+      }
+
+      const counts = Array.from(monthlyCounts.values());
+      let avgGrowth = 0;
+      if (counts.length >= 2) {
+        let totalGrowth = 0;
+        for (let i = 1; i < counts.length; i++) {
+          if (counts[i-1] > 0) totalGrowth += (counts[i] - counts[i-1]) / counts[i-1];
+        }
+        avgGrowth = totalGrowth / (counts.length - 1);
+      }
+
+      const currentCount = appointmentsInRange.length;
+      const projectedNext = Math.round(currentCount * (1 + avgGrowth));
+      const projectedAfter = Math.round(projectedNext * (1 + avgGrowth));
+
+      const nextMonth = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+      const afterMonth = new Date(start.getFullYear(), start.getMonth() + 2, 1);
+
+      predictiveForecast = [
+        { period: start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), actual: currentCount },
+        { period: nextMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), projected: projectedNext },
+        { period: afterMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), projected: projectedAfter },
+      ];
+    }
+
+    // ── 4. PRESCRIPTIVE ANALYTICS (What should we do?) ──
+    const recommendations = [];
+
+    const sortedDow = [...dayOfWeekBreakdown].sort((a, b) => a.count - b.count);
+    if (sortedDow.length > 0 && sortedDow[0].count < (appointmentsInRange.length / Math.max(sortedDow.length, 1))) {
+      recommendations.push({
+        type: 'staffing',
+        insight: sortedDow[0].day + ' has the lowest appointment volume (' + sortedDow[0].count + ' bookings). Consider adjusting staff schedules.',
+        action: 'Reduce staff on ' + sortedDow[0].day + 's or offer promotions to boost volume.',
+        impact: 'Optimize labor costs',
+      });
+    }
+
+    const busyDow = [...dayOfWeekBreakdown].sort((a, b) => b.count - a.count);
+    if (busyDow.length > 0) {
+      recommendations.push({
+        type: 'capacity',
+        insight: busyDow[0].day + ' is the busiest day (' + busyDow[0].count + ' bookings). Ensure full staffing.',
+        action: 'Schedule more staff on ' + busyDow[0].day + 's and consider extending hours.',
+        impact: 'Reduce wait times, increase patient satisfaction',
+      });
+    }
+
+    if (peakHours.length > 0) {
+      const peak = peakHours[peakHours.length - 1];
+      recommendations.push({
+        type: 'scheduling',
+        insight: 'Peak booking hour is ' + peak.hour + ' with ' + peak.count + ' appointments.',
+        action: 'Implement buffer times around ' + peak.hour + ' to manage flow.',
+        impact: 'Reduce overbooking and staff burnout',
+      });
+    }
+
+    const topServices = [...pie].sort((a, b) => b.value - a.value);
+    if (topServices.length > 0) {
+      recommendations.push({
+        type: 'marketing',
+        insight: topServices[0].name + ' is the most booked service (' + topServices[0].value + ' bookings).',
+        action: 'Feature ' + topServices[0].name + ' in promotions and social media.',
+        impact: 'Increase revenue from high-demand service',
+      });
+    }
+
+    const bottomServices = [...pie].sort((a, b) => a.value - b.value);
+    if (bottomServices.length > 0 && bottomServices[0].value < 3) {
+      recommendations.push({
+        type: 'promotion',
+        insight: bottomServices[0].name + ' has low booking volume (' + bottomServices[0].value + ' bookings).',
+        action: 'Run a limited-time discount or bundle for ' + bottomServices[0].name + '.',
+        impact: 'Increase service awareness and adoption',
+      });
+    }
+
+    if (predictiveForecast.length >= 3) {
+      const last = predictiveForecast[predictiveForecast.length - 1];
+      if (last.projected > predictiveForecast[0].actual) {
+        recommendations.push({
+          type: 'growth',
+          insight: 'Appointments are projected to grow to ' + last.projected + ' in ' + last.period + '.',
+          action: 'Prepare additional capacity and supplies to meet projected demand.',
+          impact: 'Ensure readiness for increased patient volume',
+        });
+      }
+    }
+
+    // ── 5. COMPARISON: Period-over-period ──
+    let comparison = null;
+    if (analysisType === 'monthly') {
+      const prevStart = new Date(start);
+      prevStart.setMonth(prevStart.getMonth() - 1);
+      const prevEnd = new Date(end);
+      prevEnd.setMonth(prevEnd.getMonth() - 1);
+
+      const prevRows = rows
+        .map((obj) => ({ obj, dt: toAppointmentDate(obj) }))
+        .filter((x) => x.dt && x.dt >= prevStart && x.dt < prevEnd);
+
+      comparison = {
+        current: { period: start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), count: appointmentsInRange.length },
+        previous: { period: prevStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), count: prevRows.length },
+        change: prevRows.length > 0 ? Math.round(((appointmentsInRange.length - prevRows.length) / prevRows.length) * 100) : 0,
+      };
+    } else if (analysisType === 'yearly') {
+      const prevStart = new Date(start);
+      prevStart.setFullYear(prevStart.getFullYear() - 1);
+      const prevEnd = new Date(end);
+      prevEnd.setFullYear(prevEnd.getFullYear() - 1);
+
+      const prevRows = rows
+        .map((obj) => ({ obj, dt: toAppointmentDate(obj) }))
+        .filter((x) => x.dt && x.dt >= prevStart && x.dt < prevEnd);
+
+      comparison = {
+        current: { period: `${start.getFullYear()}`, count: appointmentsInRange.length },
+        previous: { period: `${prevStart.getFullYear()}`, count: prevRows.length },
+        change: prevRows.length > 0 ? Math.round(((appointmentsInRange.length - prevRows.length) / prevRows.length) * 100) : 0,
+      };
+    }
+
+    // ── 7. REJECTION ANALYSIS (Why are appointments not completed?) ──
+    const rejectionByService = new Map();
+    const notCompletedByService = new Map();
+    for (const { obj } of appointmentsInRange) {
+      const svc = obj.service || 'Unknown';
+      if (obj.status === 'rejected') {
+        rejectionByService.set(svc, (rejectionByService.get(svc) || 0) + 1);
+      }
+      if (obj.status === 'notCompleted') {
+        notCompletedByService.set(svc, (notCompletedByService.get(svc) || 0) + 1);
+      }
+    }
+    const rejectionAnalysis = {
+      rejectedByService: Array.from(rejectionByService.entries())
+        .map(([service, count]) => ({ service, count }))
+        .sort((a, b) => b.count - a.count),
+      notCompletedByService: Array.from(notCompletedByService.entries())
+        .map(([service, count]) => ({ service, count }))
+        .sort((a, b) => b.count - a.count),
+    };
+
+    // ── 8. STATUS CHANGE TIMELINE ──
+    const statusTimelineMap = new Map();
+    for (const { obj, dt } of appointmentsInRange) {
+      if (!dt) continue;
+      const dayKey = dateKeyFromDateValue(dt) || String(dt.getDate());
+      if (!statusTimelineMap.has(dayKey)) {
+        statusTimelineMap.set(dayKey, { date: dayKey, pending: 0, accepted: 0, rejected: 0, completed: 0, notCompleted: 0 });
+      }
+      const entry = statusTimelineMap.get(dayKey);
+      if (entry && obj.status) {
+        entry[obj.status] = (entry[obj.status] || 0) + 1;
+      }
+    }
+    const statusTimeline = Array.from(statusTimelineMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+    // ── 9. SERVICE POPULARITY TREND (month-over-month) ──
+    let serviceTrend = [];
+    if (analysisType === 'monthly') {
+      const serviceMonthMap = new Map();
+      // Go back 6 months for trend
+      for (let offset = 5; offset >= 0; offset--) {
+        const tm = new Date(start);
+        tm.setMonth(tm.getMonth() - offset);
+        const key = tm.getFullYear() + '-' + String(tm.getMonth() + 1).padStart(2, '0');
+        serviceMonthMap.set(key, new Map());
+      }
+      // Also add current month
+      const currentKey = start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0');
+      if (!serviceMonthMap.has(currentKey)) {
+        serviceMonthMap.set(currentKey, new Map());
+      }
+
+      for (const { obj, dt } of rows.map((obj) => ({ obj, dt: toAppointmentDate(obj) })).filter((x) => x.dt)) {
+        const key = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+        if (serviceMonthMap.has(key)) {
+          const svc = obj.service || 'Unknown';
+          const monthMap = serviceMonthMap.get(key);
+          monthMap.set(svc, (monthMap.get(svc) || 0) + 1);
+        }
+      }
+
+      // Build trend array
+      const allServices = new Set();
+      for (const monthMap of serviceMonthMap.values()) {
+        for (const svc of monthMap.keys()) {
+          allServices.add(svc);
+        }
+      }
+
+      serviceTrend = [];
+      for (const svc of allServices) {
+        const dataPoints = [];
+        for (const [period, monthMap] of serviceMonthMap) {
+          dataPoints.push({ period, count: monthMap.get(svc) || 0 });
+        }
+        serviceTrend.push({ service: svc, data: dataPoints });
+      }
+      serviceTrend.sort((a, b) => {
+        const totalA = a.data.reduce((s, d) => s + d.count, 0);
+        const totalB = b.data.reduce((s, d) => s + d.count, 0);
+        return totalB - totalA;
+      });
+    }
+
+    // ── 10. WALK-IN VS ONLINE BOOKING COMPARISON ──
+    let walkInVsOnline = null;
+    {
+      const walkInCount = appointmentsInRange.filter(({ obj }) => obj.isWalkIn).length;
+      const onlineCount = appointmentsInRange.filter(({ obj }) => !obj.isWalkIn).length;
+      walkInVsOnline = {
+        walkIn: walkInCount,
+        online: onlineCount,
+        total: walkInCount + onlineCount,
+        walkInPercent: (walkInCount + onlineCount) > 0 ? Math.round((walkInCount / (walkInCount + onlineCount)) * 100) : 0,
+        onlinePercent: (walkInCount + onlineCount) > 0 ? Math.round((onlineCount / (walkInCount + onlineCount)) * 100) : 0,
+      };
+    }
+
     res.json({
-      type: analysisType,
-      month: req.query.month ? Number.parseInt(req.query.month, 10) : undefined,
-      year: req.query.year ? Number.parseInt(req.query.year, 10) : undefined,
-      date: dateKey,
-      pie,
-      line,
-      bar,
-      peakHours,
-      predictivePie,
+      descriptive: { pie, line, bar, peakHours },
+      diagnostic: { dayOfWeekBreakdown, serviceDowCorrelation },
+      predictive: { forecast: predictiveForecast },
+      prescriptive: { recommendations },
+      comparison,
+      rejectionAnalysis,
+      statusTimeline,
+      serviceTrend,
+      walkInVsOnline,
     });
   })
 );

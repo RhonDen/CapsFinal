@@ -118,12 +118,12 @@ function BookingPortalHome() {
                 <History className="h-6 w-6" />
               </div>
               <div>
-                <span className="text-xl font-semibold text-maastricht">Check history</span>
+                <span className="text-xl font-semibold text-maastricht">Check history or cancel an appointment</span>
                 <p className="mt-2 text-sm leading-6 text-police">
-                  Verify your OTP and see all of your past bookings grouped by date.
+                  Verify your OTP to review your past bookings or cancel a pending/approved appointment.
                 </p>
               </div>
-              <span className="text-sm font-semibold text-silver-lake group-hover:text-maastricht">View timeline →</span>
+              <span className="text-sm font-semibold text-silver-lake group-hover:text-maastricht">View & manage →</span>
             </Link>
           </div>
         </div>

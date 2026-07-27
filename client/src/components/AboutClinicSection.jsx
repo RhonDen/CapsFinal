@@ -32,16 +32,16 @@ function AboutClinicSection() {
 
           <article className="space-y-4 text-lg leading-relaxed text-police dark:text-slate-200">
             <p className="first-letter:float-left first-letter:mr-2 first-letter:text-5xl first-letter:font-bold first-letter:leading-tight first-letter:text-maastricht dark:first-letter:text-slate-100">
-              Dents-City was founded in 2025 with a single mission: to make
-              dental care comfortable, transparent, and accessible. Our
-              state-of-the-art clinic combines advanced technology with a
-              patient-first philosophy.
+              Dents-City was founded in 2025 with a single mission: to provide
+              dental clinics with a modern, reliable appointment scheduling
+              system. Our platform combines secure SMS verification, intuitive
+              booking flows, and powerful admin tools.
             </p>
             <p>
-              From routine cleanings to complex restorative procedures, our
-              team of licensed dentists and hygienists delivers gentle, precise
-              treatment in a relaxing environment. We believe that a healthy
-              smile changes lives, and we’re here to help you achieve it.
+              From automated appointment reminders to real-time schedule
+              management, Dents-City empowers dental clinics to focus on what
+              matters most — their patients. We believe great technology
+              should make healthcare accessible for everyone.
             </p>
             <p className="italic text-silver-lake">
               — Dents-City Team
@@ -57,9 +57,9 @@ function AboutClinicSection() {
               </div>
               <h3 className="mb-3 text-2xl font-semibold">Mission</h3>
               <p className="leading-relaxed text-periwinkle dark:text-periwinkle">
-                To provide exceptional dental care with integrity, compassion,
-                and the latest technology, ensuring every patient leaves with a
-                healthier, brighter smile.
+                To empower dental clinics with a seamless, secure, and
+                user-friendly appointment scheduling platform that enhances
+                patient experience and streamlines clinic operations.
               </p>
             </div>
 
@@ -69,9 +69,9 @@ function AboutClinicSection() {
               </div>
               <h3 className="mb-3 text-2xl font-semibold">Vision</h3>
               <p className="leading-relaxed text-periwinkle dark:text-periwinkle">
-                To be the leading dental clinic in Baguio City, known for
-                transforming dental visits into positive, pain-free
-                experiences.
+                To be the trusted appointment system provider for dental
+                clinics everywhere, transforming how clinics manage bookings
+                and connect with their patients.
               </p>
             </div>
           </div>
@@ -101,4 +101,3 @@ function AboutClinicSection() {
 }
 
 export default AboutClinicSection;
-

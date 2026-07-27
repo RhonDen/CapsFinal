@@ -197,7 +197,7 @@ const windowsOverlap = (firstWindow, secondWindow) =>
   secondWindow.scheduledStart < firstWindow.scheduledEnd;
 
 const isBlockingStatus = (status) =>
-  ['accepted', 'completed', 'notCompleted'].includes(status);
+  ['accepted', 'completed', 'notCompleted', 'cancelled'].includes(status);
 
 const getTodayDateKey = () => dateKeyFromDateValue(new Date());
 

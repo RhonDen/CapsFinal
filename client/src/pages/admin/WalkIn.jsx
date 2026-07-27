@@ -37,7 +37,6 @@ function WalkIn() {
       if (!form.service || !form.date) {
         setAvailableSlots([]);
         setSlotMessage('Select a service and date to view open times.');
-        setForm((current) => ({ ...current, time: '' }));
         return;
       }
 
@@ -60,16 +59,17 @@ function WalkIn() {
         setAvailableSlots(slots);
 
         // Keep time selection consistent with the returned slot list.
-        // If the existing time doesn't exist in the new slots, reset to the first slot.
+        // If the existing time doesn't exist in the new slots, auto-select the first slot.
         setForm((current) => {
-          if (!current.time || slots.length === 0) {
+          if (slots.length === 0) {
             return { ...current, time: '' };
           }
 
-          return {
-            ...current,
-            time: slots.includes(current.time) ? current.time : slots[0] || '',
-          };
+          const nextTime = slots.includes(current.time) ? current.time : slots[0] || '';
+          if (current.time === nextTime) {
+            return current;
+          }
+          return { ...current, time: nextTime };
         });
 
         if (response.data.isDateBlocked) {
@@ -240,7 +240,15 @@ function WalkIn() {
               disabled={!form.service || !form.date || slotsLoading || availableSlots.length === 0}
               className="rounded-xl border bg-white p-3 disabled:cursor-not-allowed disabled:bg-gray-100"
             >
-              <option value="">{slotsLoading ? 'Loading times...' : 'Select time'}</option>
+              <option value="">
+                {!form.service || !form.date
+                  ? 'Select service and date first'
+                  : slotsLoading
+                    ? 'Loading times...'
+                    : availableSlots.length === 0
+                      ? 'No times available'
+                      : 'Select a time'}
+              </option>
               {availableSlots.map((slot) => (
                 <option key={slot} value={slot}>
                   {formatTimeLabel(slot)}
@@ -260,7 +268,7 @@ function WalkIn() {
           />
           <textarea
             name="notes"
-            placeholder="Admin notes..."
+            placeholder="Admin notes (optional)"
             value={form.notes}
             onChange={handleChange}
             className="w-full rounded-xl border p-3"

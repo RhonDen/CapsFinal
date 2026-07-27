@@ -1,459 +1,398 @@
 import api from '../../api.js';
-import { Calendar, Filter, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Calendar, ChevronDown, ChevronUp, Filter, Search, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
 
-const STATUSES = ['pending', 'accepted', 'rejected', 'completed', 'notCompleted'];
+const STATUS_OPTIONS = [
+  { value: '', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'accepted', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'notCompleted', label: 'Not Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
-const STATUS_LABELS_FALLBACK = {
+const STATUS_BADGE = {
+  pending: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+  accepted: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  rejected: 'bg-red-50 text-red-700 ring-1 ring-red-200',
+  completed: 'bg-emerald-600 text-white',
+  notCompleted: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+  cancelled: 'bg-red-50 text-red-700 ring-1 ring-red-200',
+};
+
+const STATUS_LABEL = {
   pending: 'Pending',
   accepted: 'Approved',
   rejected: 'Rejected',
   completed: 'Completed',
   notCompleted: 'Not Completed',
+  cancelled: 'Cancelled',
 };
 
-const formatDateOnly = (value) => {
+function formatDateOnly(value) {
   if (!value) return '';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
   return d.toISOString().slice(0, 10);
-};
+}
 
-const formatDateKeyToNice = (dateKey) => {
-  if (!dateKey) return 'N/A';
-  // dateKey is YYYY-MM-DD
+function formatDateKey(dateKey) {
+  if (!dateKey) return '—';
   const [y, m, d] = String(dateKey).split('-').map(Number);
   if (!y || !m || !d) return dateKey;
-  const dt = new Date(y, m - 1, d);
-  return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-};
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
-const subtractYearsAsISODate = (years) => {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() - years);
-  return d.toISOString().slice(0, 10);
-};
+function formatTime(time) {
+  if (!time) return '—';
+  const [h, m] = time.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return time;
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const display = h % 12 || 12;
+  return `${display}:${String(m).padStart(2, '0')} ${suffix}`;
+}
 
-const STATUS_STYLES = {
-  pending: 'bg-slate-50 text-slate-700 border-slate-200',
-  accepted: 'bg-emerald-50 text-emerald-900 border-emerald-200',
-  rejected: 'bg-rose-50 text-rose-900 border-rose-200',
-  completed: 'bg-emerald-600 text-white border-emerald-700',
-  // Use a darker amber for readable contrast with dark text.
-  notCompleted: 'bg-amber-300 text-slate-900 border-amber-400',
-};
+function normalizePhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (!digits) return '';
+  let key = digits;
+  if (key.startsWith('63')) key = key.slice(2);
+  if (key.startsWith('0')) key = key.slice(1);
+  return key.length > 10 ? key.slice(-10) : key;
+}
+
+function getPatientName(row) {
+  if (row.fullName && row.fullName.trim()) return row.fullName.trim();
+  const parts = [row.firstName, row.lastName].filter(Boolean);
+  return parts.length ? parts.join(' ') : 'Unknown';
+}
 
 function History() {
-  const today = useMemo(() => {
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const [fromDate, setFromDate] = useState(() => {
     const d = new Date();
+    d.setFullYear(d.getFullYear() - 1);
     return d.toISOString().slice(0, 10);
-  }, []);
-
-  const [from, setFrom] = useState(subtractYearsAsISODate(1));
-  const [to, setTo] = useState(today);
-
-  const [status, setStatus] = useState('');
-  const [phone, setPhone] = useState('');
-
-  // Easy finding by name OR number:
-  // - server can filter phone (exact digits)
-  // - name/partial number is done client-side within the fetched date range
-  const [searchText, setSearchText] = useState('');
+  });
+  const [toDate, setToDate] = useState(today);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [phoneFilter, setPhoneFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [rows, setRows] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [expandedPhone, setExpandedPhone] = useState(null);
 
-  const buildQuery = () => {
-    const params = new URLSearchParams();
-
-    if (from) params.set('from', from);
-    if (to) params.set('to', to);
-    if (status) params.set('status', status);
-    if (phone) params.set('phone', phone.replace(/\D/g, '').slice(0, 11));
-
-    return params.toString();
-  };
-
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      const qs = buildQuery();
-      const response = await api.get(`/api/admin/history?${qs}`);
-      setRows(response.data.appointments || []);
-    } catch (requestError) {
-      setError(requestError.response?.data?.error || 'Failed to load history.');
+      const params = new URLSearchParams();
+      
+      // If search text is provided, send it to backend which ignores date filters
+      if (searchQuery.trim()) {
+        params.set('search', searchQuery.trim());
+      } else {
+        // Normal filter mode: use date range and other filters
+        if (fromDate) params.set('from', fromDate);
+        if (toDate) params.set('to', toDate);
+        if (statusFilter) params.set('status', statusFilter);
+        if (phoneFilter) params.set('phone', phoneFilter.replace(/\D/g, '').slice(0, 11));
+      }
+
+      const response = await api.get(`/api/admin/history?${params.toString()}`);
+      setAppointments(response.data.appointments || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load history.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [fromDate, toDate, statusFilter, phoneFilter, searchQuery]);
 
   useEffect(() => {
-    // initial load: past 1 year
     fetchHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchHistory]);
 
-  const effectiveRows = useMemo(() => {
-    const q = String(searchText || '').trim().toLowerCase();
-    if (!q) return rows;
+  // No client-side filtering needed — backend handles search across ALL records
+  const groupedByPhone = useMemo(() => {
+    const groups = new Map();
 
-    const digitsQ = q.replace(/\D/g, '');
-
-    return rows.filter((r) => {
-      const name = String(r.fullName || '').toLowerCase();
-      const number = String(r.number || '').toLowerCase();
-
-      // allow matching by name substring OR digits-only number substring
-      if (digitsQ) return number.replace(/\D/g, '').includes(digitsQ) || name.includes(q);
-      return name.includes(q) || number.includes(q);
+    appointments.forEach((a) => {
+      const key = normalizePhone(a.number) || `unknown-${a.id}`;
+      if (!groups.has(key)) {
+        groups.set(key, { phoneKey: key, displayNumber: a.number || 'N/A', appointments: [] });
+      }
+      groups.get(key).appointments.push(a);
     });
-  }, [rows, searchText]);
 
-  // Normalize phone so +63 and 09 are treated as the same person.
-  // Canonical strategy:
-  // - digitsOnly
-  // - if starts with "63" => remove leading "63"
-  // - if starts with "0" => remove leading "0"
-  // - keep remaining digits (if unusually long, keep last 10)
-  const normalizePhoneKey = (value) => {
-    const digits = String(value || '').replace(/\D/g, '');
-    if (!digits) return '';
+    return Array.from(groups.values())
+      .map((g) => {
+        const sorted = g.appointments.sort((a, b) => {
+          const aDate = a.scheduledStart || a.date || a.createdAt;
+          const bDate = b.scheduledStart || b.date || b.createdAt;
+          return new Date(bDate).getTime() - new Date(aDate).getTime();
+        });
+        const latest = sorted[0];
+        return {
+          ...g,
+          appointments: sorted,
+          latestName: getPatientName(latest),
+          latestDate: latest?.dateKey || latest?.date || latest?.scheduledStart,
+          count: sorted.length,
+        };
+      })
+      .sort((a, b) => {
+        const aTime = new Date(a.latestDate).getTime();
+        const bTime = new Date(b.latestDate).getTime();
+        if (!Number.isFinite(aTime) && !Number.isFinite(bTime)) return 0;
+        if (!Number.isFinite(aTime)) return 1;
+        if (!Number.isFinite(bTime)) return -1;
+        return bTime - aTime;
+      });
+  }, [appointments]);
 
-    let key = digits;
-    if (key.startsWith('63')) key = key.slice(2);
-    if (key.startsWith('0')) key = key.slice(1);
-
-    if (key.length > 10) key = key.slice(-10);
-    return key;
+  const clearFilters = () => {
+    setFromDate(() => {
+      const d = new Date();
+      d.setFullYear(d.getFullYear() - 1);
+      return d.toISOString().slice(0, 10);
+    });
+    setToDate(today);
+    setStatusFilter('');
+    setPhoneFilter('');
+    setSearchQuery('');
   };
 
-  const getFullNameForRow = (r) => {
-    const fromFull = String(r.fullName || '').trim();
-    if (fromFull) return fromFull;
-    const composed = `${r.firstName || ''} ${r.lastName || ''}`.trim();
-    return composed || 'Unknown';
-  };
+  const hasActiveFilters = fromDate !== (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 1);
+    return d.toISOString().slice(0, 10);
+  })() || toDate !== today || statusFilter !== '' || phoneFilter !== '' || searchQuery !== '';
 
   return (
     <AdminPageShell
       title="Appointment History"
-      description="Search appointments across dates/status (read-only)."
+      description="Review past appointments with powerful search and filtering."
       icon={Calendar}
       backTo="/admin/dashboard"
       backLabel="Dashboard"
       maxWidth="max-w-7xl"
     >
-      <div className="mb-6 flex flex-col gap-5 rounded-[28px] bg-white p-7 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Filter className="h-6 w-6 text-silver-lake" />
-          <p className="text-lg font-semibold text-maastricht">Filters</p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-semibold text-police">From</span>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(formatDateOnly(e.target.value))}
-              className="rounded-xl border border-gray-200 p-4 text-base"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-semibold text-police">To</span>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(formatDateOnly(e.target.value))}
-              className="rounded-xl border border-gray-200 p-4 text-base"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-semibold text-police">Status</span>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="rounded-xl border border-gray-200 p-4 text-base"
+      {/* ── Filter Panel ── */}
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-slate-400" />
+            <h2 className="text-sm font-semibold text-slate-700">Filters</h2>
+          </div>
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-red-500 transition-colors"
             >
-              <option value="">All</option>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-semibold text-police">Phone</span>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="09xxxxxxxxx"
-              className="rounded-xl border border-gray-200 p-4 text-base"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-semibold text-police">Find (name/number)</span>
-            <input
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Type a name or number…"
-              className="rounded-xl border border-gray-200 p-4 text-base"
-            />
-          </label>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={fetchHistory}
-            disabled={loading}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-maastricht px-5 py-3 text-white font-semibold transition hover:bg-police disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Searching…' : (
-              <>
-                <Search className="h-5 w-5" />
-                Search
-              </>
-            )}
-          </button>
-          {searchText ? (
-            <p className="text-base text-police">
-              Showing matches for <span className="font-semibold">{searchText}</span>
-            </p>
-          ) : null}
-        </div>
-
-        {error ? <div className="text-sm text-red-700">{error}</div> : null}
-      </div>
-
-      <div className="overflow-hidden rounded-[28px] bg-white shadow-sm">
-        <div className="p-4 sm:p-6">
-          {loading ? (
-            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-7 text-base text-police">
-              Loading history…
-            </div>
-          ) : effectiveRows.length === 0 ? (
-            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-7 text-base text-police">
-              No appointments found for selected filters.
-            </div>
-          ) : (
-            (() => {
-              const statusOrder = ['pending', 'accepted', 'rejected', 'completed', 'notCompleted'];
-
-              // Normalize phone so +63 and 09 are treated as the same person.
-              // Canonical strategy:
-              // - digitsOnly
-              // - if starts with "63" => remove leading "63"
-              // - if starts with "0" => remove leading "0"
-              // - keep remaining digits (if unusually long, keep last 10)
-              const normalizePhoneKey = (value) => {
-                const digits = String(value || '').replace(/\D/g, '');
-                if (!digits) return '';
-
-                let key = digits;
-                if (key.startsWith('63')) key = key.slice(2);
-                if (key.startsWith('0')) key = key.slice(1);
-
-                if (key.length > 10) key = key.slice(-10);
-                return key;
-              };
-
-              const getFullNameForRow = (r) => {
-                const fromFull = String(r.fullName || '').trim();
-                if (fromFull) return fromFull;
-                return `${r.firstName || ''} ${r.lastName || ''}`.trim() || 'Unknown';
-              };
-
-              // Folder grouping by normalized phone number.
-              // Each folder shows the latest appointment date on top,
-              // and inside shows past/previous appointments (newest -> oldest).
-              const byPhone = new Map();
-
-              effectiveRows.forEach((r) => {
-                const phoneKey = normalizePhoneKey(r.number);
-                const key = phoneKey || `unknown:${String(r.id ?? '')}`;
-
-                const bucket = byPhone.get(key) || [];
-                bucket.push(r);
-                byPhone.set(key, bucket);
-              });
-
-              const phoneFolders = Array.from(byPhone.entries())
-                .map(([key, appts]) => {
-                  const sorted = appts.slice().sort((a, b) => {
-                    const at = a.scheduledStart || a.date || a.createdAt;
-                    const bt = b.scheduledStart || b.date || b.createdAt;
-                    return new Date(bt).getTime() - new Date(at).getTime();
-                  });
-
-                  const latest = sorted[0];
-                  const latestDateKey = latest?.dateKey || latest?.date || latest?.scheduledStart || latest?.createdAt;
-
-                  return { key, appts: sorted, latestDateKey };
-                })
-                .sort((a, b) => {
-                  const da = new Date(a.latestDateKey).getTime();
-                  const db = new Date(b.latestDateKey).getTime();
-                  if (!Number.isFinite(da) && !Number.isFinite(db)) return String(b.key).localeCompare(String(a.key));
-                  if (!Number.isFinite(da)) return 1;
-                  if (!Number.isFinite(db)) return -1;
-                  return db - da;
-                });
-
-              const getLatestNice = (row) => {
-                const dk = row?.dateKey || row?.date;
-                return dk ? formatDateKeyToNice(dk) : 'N/A';
-              };
-
-              return (
-                <div className="space-y-6">
-                  {phoneFolders.map((folder) => {
-                    const appts = folder.appts;
-
-                    // Canonical display name = name from latest appointment (handles “same number different name”)
-                    const latestRow = appts[0];
-                    const latestName = getFullNameForRow(latestRow);
-
-                    // Group appointments within the folder by status (cards),
-                    // but list items are ordered newest -> oldest.
-                    const groupedByStatus = statusOrder.reduce((acc, s) => {
-                      acc[s] = [];
-                      return acc;
-                    }, {});
-
-                    appts.forEach((r) => {
-                      const s = r.status;
-                      if (!groupedByStatus[s]) groupedByStatus[s] = [];
-                      groupedByStatus[s].push(r);
-                    });
-
-                    const folderLatestNice = getLatestNice(latestRow);
-
-                    return (
-                      <section
-                        key={folder.key}
-                        className="rounded-[28px] border border-slate-200 bg-white shadow-sm"
-                      >
-                        <div className="flex flex-col gap-2 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake">
-                              Client folder
-                            </p>
-                            <h3 className="mt-1 text-xl font-semibold text-maastricht break-words">
-                              {latestName}
-                            </h3>
-                            <p className="mt-1 text-sm text-police">
-                              Latest: {folderLatestNice} • {appts.length} appointment{appts.length === 1 ? '' : 's'}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <div className="rounded-full bg-slate-50 px-4 py-2 text-sm font-semibold text-police whitespace-nowrap">
-                              {latestRow?.number || 'N/A'}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="p-5">
-                          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-                            {statusOrder.map((s) => {
-                              const list = groupedByStatus[s] || [];
-                              if (!list.length) return null;
-
-                              const label = STATUS_LABELS_FALLBACK[s] || s;
-
-                              return (
-                                <div
-                                  key={s}
-                                  className={`rounded-[18px] border p-4 ${
-                                    STATUS_STYLES[s] || 'border-slate-200 bg-slate-50/70 text-slate-700'
-                                  }`}
-                                >
-                                  <div className="mb-3 flex items-center justify-between gap-3">
-                                    <p className="text-base font-semibold text-slate-900">{label}</p>
-                                    <span className="rounded-full bg-white/70 px-3 py-1 text-sm font-semibold text-slate-700">
-                                      {list.length}
-                                    </span>
-                                  </div>
-
-                                  <div className="space-y-3">
-                                    {list.map((r) => {
-                                      const pillClass =
-                                        r.status === 'completed'
-                                          ? 'bg-emerald-600 text-white border-emerald-700'
-                                          : r.status === 'notCompleted'
-                                            ? 'bg-amber-300 text-slate-900 border-amber-400'
-                                            : r.status === 'accepted'
-                                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                                              : r.status === 'rejected'
-                                                ? 'bg-rose-50 text-rose-900 border-rose-200'
-                                                : 'bg-slate-50 text-slate-700 border-slate-200';
-
-                                      // list is already newest->oldest due to folder sorting,
-                                      // but statuses grouping preserves original order from appts.
-                                      return (
-                                        <article
-                                          key={r.id}
-                                          className="rounded-[16px] border border-slate-200 bg-white p-3"
-                                        >
-                                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                            <div className="min-w-0">
-                                              <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                                                  {r.time || 'N/A'}
-                                                </p>
-                                                <span
-                                                  className={`rounded-full border px-3 py-1 text-sm font-semibold ${pillClass}`}
-                                                >
-                                                  {STATUS_LABELS_FALLBACK[r.status] || r.status}
-                                                </span>
-                                              </div>
-                                              <h4 className="mt-2 break-words text-lg font-semibold text-slate-900">
-                                                {getFullNameForRow(r)}
-                                              </h4>
-                                              <p className="mt-1 text-base font-semibold text-slate-700">
-                                                {r.service}
-                                              </p>
-                                            </div>
-                                            <div className="flex flex-col gap-1 sm:items-end">
-                                              <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                                                Phone
-                                              </p>
-                                              <p className="text-base font-semibold text-slate-900 whitespace-nowrap">
-                                                {r.number}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </article>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </section>
-                    );
-                  })}
-                </div>
-              );
-            })()
+              <X className="h-3.5 w-3.5" />
+              Clear all
+            </button>
           )}
         </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">From</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">To</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100"
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">Phone</label>
+            <input
+              type="text"
+              value={phoneFilter}
+              onChange={(e) => setPhoneFilter(e.target.value)}
+              placeholder="09XXXXXXXXX"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-300 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">Search</label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Name or number…"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-300 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            onClick={fetchHistory}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? (
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <Search className="h-4 w-4" />
+            )}
+            {loading ? 'Searching…' : 'Search'}
+          </button>
+          {searchQuery && (
+            <span className="text-xs text-slate-400">
+              Filtering by <strong className="text-slate-600">"{searchQuery}"</strong>
+            </span>
+          )}
+        </div>
+
+        {error && (
+          <div className="mt-3 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600">{error}</div>
+        )}
       </div>
+
+      {/* ── Results ── */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="flex items-center gap-3 text-slate-400">
+              <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+              <span className="text-sm">Loading history…</span>
+            </div>
+          </div>
+        ) : groupedByPhone.length === 0 ? (
+          <div className="py-16 text-center">
+            <Calendar className="mx-auto h-10 w-10 text-slate-200" />
+            <p className="mt-3 text-sm text-slate-400">No appointments found for the selected filters.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {groupedByPhone.map((group) => {
+              const isExpanded = expandedPhone === group.phoneKey;
+
+              return (
+                <div key={group.phoneKey}>
+                  {/* ── Group Header ── */}
+                  <button
+                    onClick={() => setExpandedPhone(isExpanded ? null : group.phoneKey)}
+                    className="flex w-full items-center justify-between px-5 py-4 text-left transition hover:bg-slate-50 sm:px-6"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-slate-900 truncate">
+                          {group.latestName}
+                        </h3>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${group.count > 1 ? 'bg-purple-50 text-purple-700 ring-1 ring-purple-200' : 'bg-slate-50 text-slate-500 ring-1 ring-slate-200'}`}>
+                          {group.count}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {group.displayNumber} &middot; Latest: {formatDateKey(group.latestDate)}
+                      </p>
+                    </div>
+                    <div className="ml-4 flex-shrink-0 text-slate-300">
+                      {isExpanded ? (
+                        <ChevronUp className="h-5 w-5" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5" />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* ── Expanded Appointments ── */}
+                  {isExpanded && (
+                    <div className="border-t border-slate-100 bg-slate-50/50">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="border-b border-slate-100">
+                              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Date</th>
+                              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Time</th>
+                              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Patient</th>
+                              <th className="hidden px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:table-cell sm:px-6">Service</th>
+                              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {group.appointments.map((a) => (
+                              <tr key={a.id} className="transition hover:bg-white">
+                                <td className="whitespace-nowrap px-5 py-3 text-sm text-slate-700 sm:px-6">
+                                  {formatDateKey(a.dateKey || a.date)}
+                                </td>
+                                <td className="whitespace-nowrap px-5 py-3 text-sm text-slate-700 sm:px-6">
+                                  {formatTime(a.time)}
+                                </td>
+                                <td className="px-5 py-3 text-sm font-medium text-slate-900 sm:px-6">
+                                  <div>{getPatientName(a)}</div>
+                                  <div className="text-xs text-slate-400">{a.number}</div>
+                                </td>
+                                <td className="hidden whitespace-nowrap px-5 py-3 text-sm text-slate-600 sm:table-cell sm:px-6">
+                                  {a.service || '—'}
+                                </td>
+                                <td className="whitespace-nowrap px-5 py-3 sm:px-6">
+                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[a.status] || 'bg-slate-50 text-slate-600 ring-1 ring-slate-200'}`}>
+                                    {STATUS_LABEL[a.status] || a.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Summary ── */}
+      {!loading && groupedByPhone.length > 0 && (
+        <div className="mt-4 text-center text-xs text-slate-400">
+          Showing {groupedByPhone.length} patient group{groupedByPhone.length !== 1 ? 's' : ''} &middot;{' '}
+          {appointments.length} total appointment{appointments.length !== 1 ? 's' : ''}
+        </div>
+      )}
     </AdminPageShell>
   );
 }
 
 export default History;
-

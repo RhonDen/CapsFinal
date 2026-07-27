@@ -1,10 +1,12 @@
+// Force PH timezone so all Date operations use Asia/Manila (UTC+8)
+process.env.TZ = 'Asia/Manila';
+
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const mongoSanitize = require('mongo-sanitize');
 const cookieParser = require('cookie-parser');
 const { connectDatabase } = require('./utils/database');
 // Note: `ensureDefaultAdmin` and route modules are required after DB
@@ -59,14 +61,7 @@ const otpLimiter = rateLimit({
 app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser());
 
-// Strip Mongo operators from incoming payloads to reduce NoSQL injection risk.
-app.use((req, res, next) => {
-  req.body = mongoSanitize(req.body);
-  req.query = mongoSanitize(req.query);
-  req.params = mongoSanitize(req.params);
-  next();
-});
-
+// ── API Routes ─────────────────────────────────────────────────────
 app.use('/api/bookings/request-otp', otpLimiter);
 app.use('/api/bookings/history/request-otp', otpLimiter);
 
@@ -83,8 +78,10 @@ app.get('/api/health', (req, res) => {
  * Keeping the SPA serving enabled in dev can cause stale UI / mismatched behavior.
  */
 const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+const fs = require('fs');
 
-if (process.env.NODE_ENV === 'production') {
+// If the built dist folder exists, serve it (works in both dev & production)
+if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath));
 
   // SPA fallback: serve index.html for all non-API routes
@@ -94,10 +91,13 @@ if (process.env.NODE_ENV === 'production') {
       if (err) next();
     });
   });
+
+  console.log(`Serving React static files from: ${clientDistPath}`);
+} else {
+  console.log('No client/dist folder found. Run "npm run build" first for production mode, or use Vite dev server on port 5173.');
 }
 
 app.use((error, req, res, next) => {
-
   void next;
   console.error('Unhandled server error:', error);
   res.status(500).json({ error: 'Internal server error.' });
@@ -124,7 +124,6 @@ const startServer = async () => {
     app.use('/api/admin', adminRoute);
     app.use('/api/public', publicBlockedDatesRoute);
 
-
     console.log(
       database.mode === 'sqlite'
         ? `Connected to SQLite at ${database.uri}`
@@ -133,7 +132,6 @@ const startServer = async () => {
 
     const port = Number(process.env.PORT) || 5000;
     const server = app.listen(port, () => {
-
       console.log(`Server running on port ${port}`);
       console.log(`Serving React from: ${clientDistPath}`);
     });
@@ -147,9 +145,8 @@ const startServer = async () => {
       throw err;
     });
 
-
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error('Database connection error:', error);
     process.exit(1);
   }
 };

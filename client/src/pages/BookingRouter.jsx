@@ -13,14 +13,14 @@ import BookingPortalHome from './BookingPortalHome.jsx';
 const PORTAL_OPTIONS = [
   {
     to: 'new',
-    label: 'Book Visit',
+    label: 'Appoint Schedule',
     description: 'Create a new dental appointment.',
     icon: FileText,
   },
   {
     to: 'history',
-    label: 'Visit History',
-    description: 'Check records using OTP.',
+    label: 'Check history / Cancel',
+    description: 'Review past bookings or cancel a pending/approved appointment using OTP.',
     icon: History,
   },
 ];
@@ -58,9 +58,7 @@ function BookingRouter() {
                 Appointment Portal
               </h1>
               <p className="max-w-2xl text-base leading-8 text-police md:text-lg">
-                Book a visit or review your dental appointment history through a
-                lighter, mobile-friendly portal. Each step opens smoothly below
-                so patients always know where to continue next.
+                Book appointments, check history or cancell appointments. Note: if You're using a mobile device simply click a service and scroll down to fill up more details.
               </p>
             </div>
 

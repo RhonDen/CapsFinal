@@ -29,6 +29,7 @@ const ANALYSIS_TYPES = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
   { value: 'predictive', label: 'Predictive (Next Month)' },
 ];
 
@@ -62,9 +63,17 @@ function DataAnalysis() {
     bar: [],
     peakHours: [],
     predictivePie: [],
+    diagnostic: null,
+    predictive: null,
+    comparison: null,
+    rejectionAnalysis: null,
+    statusTimeline: [],
+    serviceTrend: [],
+    walkInVsOnline: null,
   });
 
   const [selectedPredictiveService, setSelectedPredictiveService] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -74,6 +83,7 @@ function DataAnalysis() {
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
+        setLoading(true);
         let params = {};
 
         if (analysisType === 'daily') {
@@ -82,6 +92,8 @@ function DataAnalysis() {
           params = { type: 'weekly', date: selectedDate };
         } else if (analysisType === 'predictive') {
           params = { type: 'predictive', month: selectedMonth, year: selectedYear };
+        } else if (analysisType === 'yearly') {
+          params = { type: 'yearly', year: selectedYear };
         } else {
           params = { type: 'monthly', month: selectedMonth, year: selectedYear };
         }
@@ -103,7 +115,6 @@ function DataAnalysis() {
 
               const valueNum = Number(rawValue);
               return {
-                // Keep only what Recharts needs; avoid leaking unexpected keys
                 name: formatServiceLabel(String(rawName)),
                 value: Number.isFinite(valueNum) ? valueNum : 0,
               };
@@ -111,19 +122,31 @@ function DataAnalysis() {
             .filter((x) => x.name);
         };
 
+        const descriptive = response.data.descriptive || {};
+        const diagnostic = response.data.diagnostic || null;
+        const predictive = response.data.predictive || null;
+        const comparison = response.data.comparison || null;
+
         const normalizedPredictivePie = normalizePie(
-          response.data.predictivePie || response.data.pie
+          response.data.predictivePie || descriptive.pie
         );
 
         setData({
-          pie: normalizePie(response.data.pie),
+          pie: normalizePie(descriptive.pie),
           predictivePie: normalizedPredictivePie,
-          line: response.data.line || [],
-          bar: (response.data.bar || []).map((item) => ({
+          line: descriptive.line || [],
+          bar: (descriptive.bar || []).map((item) => ({
             ...item,
-            statusLabel: formatStatusLabel(item.status),
+            statusLabel: formatStatusLabel(item.name),
           })),
-          peakHours: Array.isArray(response.data.peakHours) ? response.data.peakHours : [],
+          peakHours: Array.isArray(descriptive.peakHours) ? descriptive.peakHours : [],
+          diagnostic,
+          predictive,
+          comparison,
+          rejectionAnalysis: response.data.rejectionAnalysis || null,
+          statusTimeline: response.data.statusTimeline || [],
+          serviceTrend: response.data.serviceTrend || [],
+          walkInVsOnline: response.data.walkInVsOnline || null,
         });
 
         // Reset predictive selection when range changes
@@ -138,6 +161,8 @@ function DataAnalysis() {
         }
       } catch (error) {
         console.error('Analytics fetch error:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -148,6 +173,7 @@ function DataAnalysis() {
     if (analysisType === 'daily') return 'Daily Analysis';
     if (analysisType === 'weekly') return 'Weekly Analysis';
     if (analysisType === 'predictive') return 'Predictive (Next Month) Analysis';
+    if (analysisType === 'yearly') return 'Yearly Analysis';
     return 'Monthly Analysis';
   }, [analysisType]);
 
@@ -162,6 +188,9 @@ function DataAnalysis() {
       const monthLabel =
         MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label || 'Selected Month';
       return `Forecast for the next month based on ${monthLabel} ${selectedYear} and recent demand.`;
+    }
+    if (analysisType === 'yearly') {
+      return `Analysis for ${selectedYear}: monthly breakdown of completed services and status distribution.`;
     }
     const monthLabel =
       MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label || 'Selected Month';
@@ -205,6 +234,23 @@ function DataAnalysis() {
                 onChange={(event) => setSelectedDate(event.target.value)}
                 className="rounded-xl border bg-white px-4 py-2 text-sm text-maastricht dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
               />
+            </>
+          )}
+
+          {analysisType === 'yearly' && (
+            <>
+              <label className="text-sm font-medium text-maastricht dark:text-slate-200">Year</label>
+              <select
+                value={selectedYear}
+                onChange={(event) => setSelectedYear(Number(event.target.value))}
+                className="rounded-xl border bg-white px-4 py-3 text-sm text-maastricht dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              >
+                {yearOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </>
           )}
 
@@ -398,7 +444,7 @@ function DataAnalysis() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data.line || []}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
+                <XAxis dataKey="name" />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Line type="monotone" dataKey="count" stroke="#27496A" strokeWidth={2.5} />
@@ -423,6 +469,281 @@ function DataAnalysis() {
           </div>
         </div>
       </div>
+
+      {/* ── DIAGNOSTIC ANALYTICS ── */}
+      {data.diagnostic && (
+        <div className="mt-8">
+          <h2 className="mb-2 text-xl font-bold text-maastricht dark:text-slate-100">Diagnostic Analytics</h2>
+          <p className="mb-4 text-sm text-police dark:text-slate-300">
+            Why did it happen? — Day-of-week breakdown and service correlation.
+          </p>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+              <h3 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">Appointments by Day of Week</h3>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.diagnostic.dayOfWeekBreakdown || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="day" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#27496A" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+              <h3 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">Service × Day Correlation</h3>
+              <div className="max-h-[280px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-police dark:border-slate-600 dark:text-slate-300">
+                      <th className="pb-2 font-semibold">Service</th>
+                      <th className="pb-2 font-semibold">Day</th>
+                      <th className="pb-2 text-right font-semibold">Bookings</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.diagnostic.serviceDowCorrelation || []).map((item, idx) => (
+                      <tr key={idx} className="border-b border-slate-100 dark:border-slate-700">
+                        <td className="py-2 text-maastricht dark:text-slate-200">{item.service}</td>
+                        <td className="py-2 text-police dark:text-slate-300">{item.day}</td>
+                        <td className="py-2 text-right font-semibold text-maastricht dark:text-slate-200">{item.count}</td>
+                      </tr>
+                    ))}
+                    {(!data.diagnostic.serviceDowCorrelation || data.diagnostic.serviceDowCorrelation.length === 0) && (
+                      <tr>
+                        <td colSpan="3" className="py-4 text-center text-police dark:text-slate-400">No data.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REJECTION ANALYSIS ── */}
+      {data.rejectionAnalysis && (
+        <div className="mt-8">
+          <h2 className="mb-2 text-xl font-bold text-maastricht dark:text-slate-100">Rejection &amp; Cancellation Analysis</h2>
+          <p className="mb-4 text-sm text-police dark:text-slate-300">
+            Which services have the most rejections or no-shows? — Identify problem areas.
+          </p>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+              <h3 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">Rejected by Service</h3>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.rejectionAnalysis.rejectedByService || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="service" tick={false} />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip formatter={(value) => [value, "Rejected"]} />
+                    <Bar dataKey="count" fill="#EF4444" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 max-h-[160px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-police dark:border-slate-600">
+                      <th className="pb-2 font-semibold">Service</th>
+                      <th className="pb-2 text-right font-semibold">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.rejectionAnalysis.rejectedByService || []).map((item, idx) => (
+                      <tr key={idx} className="border-b border-slate-100 dark:border-slate-700">
+                        <td className="py-2 text-maastricht dark:text-slate-200">{item.service}</td>
+                        <td className="py-2 text-right font-semibold text-red-600">{item.count}</td>
+                      </tr>
+                    ))}
+                    {(!data.rejectionAnalysis.rejectedByService || data.rejectionAnalysis.rejectedByService.length === 0) && (
+                      <tr>
+                        <td colSpan="2" className="py-4 text-center text-police dark:text-slate-400">No rejections.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+              <h3 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">Not Completed by Service</h3>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.rejectionAnalysis.notCompletedByService || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="service" tick={false} />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip formatter={(value) => [value, "Not Completed"]} />
+                    <Bar dataKey="count" fill="#F59E0B" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 max-h-[160px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-police dark:border-slate-600">
+                      <th className="pb-2 font-semibold">Service</th>
+                      <th className="pb-2 text-right font-semibold">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.rejectionAnalysis.notCompletedByService || []).map((item, idx) => (
+                      <tr key={idx} className="border-b border-slate-100 dark:border-slate-700">
+                        <td className="py-2 text-maastricht dark:text-slate-200">{item.service}</td>
+                        <td className="py-2 text-right font-semibold text-amber-600">{item.count}</td>
+                      </tr>
+                    ))}
+                    {(!data.rejectionAnalysis.notCompletedByService || data.rejectionAnalysis.notCompletedByService.length === 0) && (
+                      <tr>
+                        <td colSpan="2" className="py-4 text-center text-police dark:text-slate-400">All appointments completed.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── STATUS TIMELINE ── */}
+      {data.statusTimeline && data.statusTimeline.length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-2 text-xl font-bold text-maastricht dark:text-slate-100">Status Timeline</h2>
+          <p className="mb-4 text-sm text-police dark:text-slate-300">How appointments moved through statuses over time.</p>
+          <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+            <div className="h-[320px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.statusTimeline}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="accepted" stackId="a" fill="#3B82F6" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="rejected" stackId="a" fill="#EF4444" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="completed" stackId="a" fill="#10B981" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="notCompleted" stackId="a" fill="#F59E0B" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── WALK-IN VS ONLINE ── */}
+      {data.walkInVsOnline && data.walkInVsOnline.total > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-2 text-xl font-bold text-maastricht dark:text-slate-100">Walk-in vs Online</h2>
+          <p className="mb-4 text-sm text-police dark:text-slate-300">How patients are booking — walk-in vs online appointments.</p>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+              <p className="text-sm font-medium text-police dark:text-slate-300">Walk-in</p>
+              <p className="mt-2 text-3xl font-bold text-amber-600">{data.walkInVsOnline.walkIn}</p>
+              <p className="mt-1 text-sm text-police dark:text-slate-300">{data.walkInVsOnline.walkInPercent}% of total</p>
+            </div>
+            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+              <p className="text-sm font-medium text-police dark:text-slate-300">Online</p>
+              <p className="mt-2 text-3xl font-bold text-blue-600">{data.walkInVsOnline.online}</p>
+              <p className="mt-1 text-sm text-police dark:text-slate-300">{data.walkInVsOnline.onlinePercent}% of total</p>
+            </div>
+            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+              <p className="text-sm font-medium text-police dark:text-slate-300">Total</p>
+              <p className="mt-2 text-3xl font-bold text-maastricht dark:text-slate-100">{data.walkInVsOnline.total}</p>
+              <p className="mt-1 text-sm text-police dark:text-slate-300">appointments in range</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SERVICE POPULARITY TREND ── */}
+      {data.serviceTrend && data.serviceTrend.length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-2 text-xl font-bold text-maastricht dark:text-slate-100">Service Popularity Trend</h2>
+          <p className="mb-4 text-sm text-police dark:text-slate-300">Month-over-month service demand changes (last 6 months).</p>
+          <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+            <div className="max-h-[400px] overflow-y-auto space-y-6">
+              {data.serviceTrend.slice(0, 6).map((svc, idx) => (
+                <div key={idx}>
+                  <h3 className="mb-2 text-sm font-semibold text-maastricht dark:text-slate-200">{svc.service}</h3>
+                  <div className="h-[120px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={svc.data}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="period" tick={{ fontSize: 11 }} />
+                        <YAxis allowDecimals={false} domain={[0, 'auto']} width={30} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="count" stroke={COLORS[idx % COLORS.length]} strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PREDICTIVE FORECAST ── */}
+      {data.predictive && data.predictive.forecast && data.predictive.forecast.length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-2 text-xl font-bold text-maastricht dark:text-slate-100">Predictive Analytics</h2>
+          <p className="mb-4 text-sm text-police dark:text-slate-300">What might happen? — Forecast based on historical trends.</p>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {data.predictive.forecast.map((item, idx) => (
+              <div key={idx} className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-police dark:text-slate-300">{item.period}</p>
+                  {item.actual !== undefined && (
+                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-200">Actual</span>
+                  )}
+                  {item.projected !== undefined && (
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900 dark:text-amber-200">Projected</span>
+                  )}
+                </div>
+                <p className="mt-4 text-3xl font-bold text-maastricht dark:text-slate-100">
+                  {item.actual !== undefined ? item.actual : item.projected}
+                </p>
+                <p className="mt-1 text-sm text-police dark:text-slate-300">appointments</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── COMPARISON ── */}
+      {data.comparison && (
+        <div className="mt-8">
+          <h2 className="mb-2 text-xl font-bold text-maastricht dark:text-slate-100">Period Comparison</h2>
+          <p className="mb-4 text-sm text-police dark:text-slate-300">How does this period compare to the previous one?</p>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+              <p className="text-sm font-medium text-police dark:text-slate-300">{data.comparison.previous?.period || 'Previous'}</p>
+              <p className="mt-2 text-3xl font-bold text-maastricht dark:text-slate-100">{data.comparison.previous?.count || 0}</p>
+              <p className="mt-1 text-sm text-police dark:text-slate-300">appointments</p>
+            </div>
+            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+              <p className="text-sm font-medium text-police dark:text-slate-300">{data.comparison.current?.period || 'Current'}</p>
+              <p className="mt-2 text-3xl font-bold text-maastricht dark:text-slate-100">{data.comparison.current?.count || 0}</p>
+              <p className="mt-1 text-sm text-police dark:text-slate-300">appointments</p>
+            </div>
+            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+              <p className="text-sm font-medium text-police dark:text-slate-300">Change</p>
+              <p className={`mt-2 text-3xl font-bold ${data.comparison.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {data.comparison.change >= 0 ? '+' : ''}{data.comparison.change}%
+              </p>
+              <p className="mt-1 text-sm text-police dark:text-slate-300">
+                {data.comparison.change >= 0 ? 'increase' : 'decrease'} from previous
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
     </AdminPageShell>
   );
 }

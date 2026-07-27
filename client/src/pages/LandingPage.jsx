@@ -21,6 +21,7 @@ import AboutClinicSection from '../components/AboutClinicSection.jsx';
 import SectionHeading from '../components/SectionHeading.jsx';
 import PublicDarkModeToggle from '../components/PublicDarkModeToggle.jsx';
 import { FEATURED_SERVICES } from '../constants/services.js';
+import { getServiceIcon } from '../constants/serviceIcons.jsx';
 import { formatServiceLabel } from '../utils/schedule.js';
 
 import jester from '../assets/jester.png';
@@ -233,6 +234,7 @@ function LandingPage() {
             <div className="mt-8 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
               {FEATURED_SERVICES.map((service) => {
                 const [name, duration] = formatServiceLabel(service).split(' - ');
+                const ServiceIcon = getServiceIcon(service);
 
                 return (
                   <div
@@ -240,7 +242,7 @@ function LandingPage() {
                     className="group rounded-[24px] border border-slate-200/80 bg-[linear-gradient(145deg,#ffffff,#f5fbff)] p-8 shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:border-slate-700 dark:bg-slate-800/80"
                   >
                     <div className="mb-4 inline-flex rounded-2xl bg-cyan-50 p-3 text-cyan-700 transition group-hover:scale-105 dark:bg-slate-700 dark:text-cyan-200">
-                      <BadgeCheck className="h-5 w-5" />
+                      {ServiceIcon}
                     </div>
                     <h3 className="mb-2 text-xl font-semibold text-maastricht dark:text-slate-100">
                       {name}

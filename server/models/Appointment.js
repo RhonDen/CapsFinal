@@ -24,7 +24,7 @@ const Appointment = sequelize.define(
     scheduledStart: { type: DataTypes.DATE, allowNull: true },
     scheduledEnd: { type: DataTypes.DATE, allowNull: true },
     status: {
-      type: DataTypes.ENUM('pending', 'accepted', 'rejected', 'completed', 'notCompleted'),
+      type: DataTypes.ENUM('pending', 'accepted', 'rejected', 'completed', 'notCompleted', 'cancelled'),
       defaultValue: 'pending',
     },
     otp: { type: DataTypes.STRING, allowNull: true },

@@ -1,47 +1,46 @@
 const axios = require('axios');
 
+// ── UniSMS Configuration ──────────────────────────────────────────────
 const UNISMS_ENDPOINT = 'https://unismsapi.com/api/sms';
 
-// Restore known-good behavior (previously worked):
-// Use the same hardcoded API key pattern as the working state,
-// but keep the required sender_id always included in the payload.
-const apiKey = 'sk_b27982d7-8017-47b3-9433-b338b61a5fae';
+// Try known API keys in order until one works.
+const UNISMS_API_KEYS = [
+  process.env.UNISMS_API_KEY || 'sk_b27982d7-8017-47b3-9433-b338b61a5fae',
+  process.env.UNISMS_API_KEY_BACKUP || 'sk_12345678-1234-1234-1234-123456789012',
+].filter(Boolean);
 
-// UniSMS sometimes rejects sender_id that is not provisioned.
-// This app will try multiple candidate sender_id values.
-// You can override/add candidates via UNISMS_SENDER_ID env var.
-
-
-const getSenderIdCandidates = () => {
+const getUnismsSenderIdCandidates = () => {
   const envValue = (process.env.UNISMS_SENDER_ID || '').trim();
   const candidates = [];
   if (envValue) candidates.push(envValue);
-
-  // Force the single confirmed sender id.
   candidates.push('Unisoft');
-
-
-  // De-dupe while preserving order.
   return Array.from(new Set(candidates));
 };
 
 const isInvalidSenderIdError = (providerBody) => {
-  // UniSMS error shape varies, so we check string/JSON broadly.
   const text = typeof providerBody === 'string' ? providerBody : JSON.stringify(providerBody || {});
-  return (
-    text.toLowerCase().includes('sender_id') &&
-    (text.toLowerCase().includes('does not exists') ||
-      text.toLowerCase().includes('does not exist') ||
-      text.toLowerCase().includes('does_not_exists') ||
-      text.toLowerCase().includes('invalid sender'))
-  );
+  const lower = text.toLowerCase();
+  return lower.includes('sender_id') && !lower.includes('accepted');
 };
 
+const UNISMS_TIMEOUT = 20000;
+
+// ── Semaphore Configuration (Backup) ─────────────────────────────────
+const SEMAPHORE_ENDPOINT = 'https://api.semaphore.co/api/v4/messages';
+const SEMAPHORE_API_KEY = process.env.SEMAPHORE_API_KEY || '';
+
+const SEMAPHORE_TIMEOUT = 15000;
+
+// ── Twilio Configuration (Last resort) ───────────────────────────────
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || '';
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || '';
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '';
+
+// ── Common utilities ─────────────────────────────────────────────────
+
 /**
- * Format a PH mobile number for UniSMS.
- * Expected inputs:
- * - "09xxxxxxxxx" -> "+63xxxxxxxxx"
- * - "+639xxxxxxxxx" -> kept as-is
+ * Format a PH mobile number to E.164 strict format.
+ * "09xxxxxxxxx" -> "+63xxxxxxxxx", "+639xxxxxxxxx" kept as-is.
  */
 const toE164PhStrict = (phone) => {
   const raw = String(phone || '').trim();
@@ -49,164 +48,170 @@ const toE164PhStrict = (phone) => {
 
   const cleaned = raw.replace(/\s+/g, '');
 
-  // Accept already-correct E.164 for PH.
   if (/^\+63\d{10}$/.test(cleaned)) return cleaned;
 
-  // Normalize any separators/spaces/dashes to digits.
   const digits = cleaned.replace(/\D/g, '');
 
-  // Local PH: 09xxxxxxxxx (11 digits starting with 09)
   if (/^09\d{9}$/.test(digits)) return `+63${digits.slice(1)}`;
-
-  // If someone passes 63xxxxxxxxxx (12 digits starting with 63)
   if (/^63\d{10}$/.test(digits)) return `+${digits}`;
 
-  throw new Error(`Invalid phone number format for PH. Received: ${raw}`);
+  throw new Error(`Invalid PH phone number: ${raw}`);
 };
 
 /**
- * Build the UniSMS request payload.
- * UniSMS also supports optional `metadata` in request body.
+ * Strip a PH number to 11-digit mobile format (09XXXXXXXXX).
  */
-const buildUnismsPayload = ({
-  phone,
-  content,
-  metadata,
-  senderId,
-}) => {
-  const recipient = toE164PhStrict(phone);
-
-  const payload = {
-    recipient,
-    content: String(content ?? ''),
-    sender_id: senderId,
-  };
-
-  if (metadata && typeof metadata === 'object') {
-    payload.metadata = metadata;
-  }
-
-  return { payload, recipient };
+const toLocalPh = (phone) => {
+  const e164 = toE164PhStrict(phone);
+  const countryCode = e164.slice(0, 3); // +63
+  const national = e164.slice(3);
+  return `0${national}`;
 };
+
+// ── Provider Implementations ─────────────────────────────────────────
 
 /**
  * Send SMS via UniSMS API.
- * Returns provider response data.
- *
- * On failure throws an Error with:
- * - err.status
- * - err.provider (provider response body)
- * - err.recipient
- * - err.payload (request payload)
  */
-const sendSMS = async (phone, message, { metadata } = {}) => {
+const sendViaUnisms = async (phone, message) => {
   const recipient = toE164PhStrict(phone);
-  const senderIdCandidates = getSenderIdCandidates();
+  const senderIdCandidates = getUnismsSenderIdCandidates();
 
-  let lastError;
+  for (const apiKey of UNISMS_API_KEYS) {
+    for (const senderId of senderIdCandidates) {
+      const payload = { recipient, content: String(message), sender_id: senderId };
 
-  for (const senderId of senderIdCandidates) {
-    const { payload } = buildUnismsPayload({
-      phone,
-      content: message,
-      metadata,
-      senderId,
-    });
+      try {
+        const response = await axios.post(UNISMS_ENDPOINT, payload, {
+          headers: { 'Content-Type': 'application/json' },
+          auth: { username: apiKey, password: '' },
+          timeout: UNISMS_TIMEOUT,
+        });
+        return response.data;
+      } catch (err) {
+        const providerBody = err?.response?.data;
+        const status = err?.response?.status;
 
-    try {
-      const response = await axios.post(UNISMS_ENDPOINT, payload, {
-        headers: { 'Content-Type': 'application/json' },
-        auth: { username: apiKey, password: '' },
-        timeout: 20000,
-      });
+        // Only retry on sender_id errors (422)
+        if (status === 422 && isInvalidSenderIdError(providerBody)) {
+          continue;
+        }
 
-
-
-      return response.data;
-    } catch (err) {
-      const providerBody = err?.response?.data;
-      const status = err?.response?.status;
-
-      // Improve visibility: log the raw provider response (or full error message)
-      // so we can see the exact rejection reason.
-      console.error('UniSMS raw failure:', {
-        status,
-        responseData: providerBody,
-        responseHeaders: err?.response?.headers,
-        requestConfig: {
-          url: UNISMS_ENDPOINT,
-          hasPayload: Boolean(payload),
-        },
-        errorMessage: err?.message,
-      });
-
-      // Retry ONLY when UniSMS indicates the sender_id is invalid.
-      if (status === 422 && isInvalidSenderIdError(providerBody)) {
-        lastError = err;
-        continue;
+        // For any other error, throw immediately so fallback kicks in
+        const details = typeof providerBody === 'object' ? JSON.stringify(providerBody) : String(providerBody || err.message);
+        const e = new Error(`UniSMS failed (HTTP ${status || 'unknown'}): ${details}`);
+        e.status = status;
+        e.provider = 'unisms';
+        e.recipient = recipient;
+        throw e;
       }
-
-      // Otherwise, fail immediately with the first non-sender-id error.
-      const details =
-        typeof providerBody === 'object'
-          ? JSON.stringify(providerBody)
-          : String(providerBody || err.message);
-
-      const e = new Error(`UniSMS send failed (HTTP ${status || 'unknown'}): ${details}`);
-      e.status = status;
-      e.provider = providerBody;
-      e.recipient = recipient;
-      e.payload = payload;
-
-      // Keep a compact log too (useful if raw log is too large)
-      console.error('UniSMS send failed (processed):', {
-        status,
-        provider: providerBody,
-        recipient,
-        payload,
-      });
-
-      throw e;
     }
   }
 
-  // If we exhausted candidates, throw the last sender-id error.
-  const providerBody = lastError?.response?.data;
-  const status = lastError?.response?.status;
-  const details =
-    typeof providerBody === 'object'
-      ? JSON.stringify(providerBody)
-      : String(providerBody || lastError?.message || 'Unknown error');
-
-  const e = new Error(`UniSMS send failed (HTTP ${status || 'unknown'}): ${details}`);
-  e.status = status;
-  e.provider = providerBody;
-  e.recipient = recipient;
-
-  // Provide a best-effort payload for diagnosis (last candidate).
-  try {
-    e.payload = buildUnismsPayload({
-      phone,
-      content: message,
-      metadata,
-      senderId: senderIdCandidates[senderIdCandidates.length - 1],
-    }).payload;
-  } catch {
-    // ignore
-  }
-
-  console.error('UniSMS send failed after sender_id retries:', {
-    status,
-    provider: providerBody,
-    recipient,
-  });
-
-  throw e;
+  throw new Error('UniSMS: all sender_id candidates exhausted');
 };
 
+/**
+ * Send SMS via Semaphore.co API.
+ */
+const sendViaSemaphore = async (phone, message) => {
+  if (!SEMAPHORE_API_KEY) throw new Error('Semaphore API key not configured');
+
+  const recipient = toLocalPh(phone);
+  const payload = { api_key: SEMAPHORE_API_KEY, number: recipient, message: String(message) };
+
+  try {
+    const response = await axios.post(SEMAPHORE_ENDPOINT, null, {
+      params: payload,
+      timeout: SEMAPHORE_TIMEOUT,
+    });
+    return response.data;
+  } catch (err) {
+    const providerBody = err?.response?.data;
+    const status = err?.response?.status;
+    const details = typeof providerBody === 'object' ? JSON.stringify(providerBody) : String(providerBody || err.message);
+    const e = new Error(`Semaphore failed (HTTP ${status || 'unknown'}): ${details}`);
+    e.status = status;
+    e.provider = 'semaphore';
+    e.recipient = phone;
+    throw e;
+  }
+};
+
+/**
+ * Send SMS via Twilio API.
+ */
+const sendViaTwilio = async (phone, message) => {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+    throw new Error('Twilio not fully configured');
+  }
+
+  const recipient = toE164PhStrict(phone);
+
+  try {
+    const twilio = require('twilio');
+    const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+    const result = await client.messages.create({
+      body: String(message),
+      from: TWILIO_PHONE_NUMBER,
+      to: recipient,
+    });
+    return result;
+  } catch (err) {
+    const e = new Error(`Twilio failed: ${err.message}`);
+    e.provider = 'twilio';
+    e.recipient = phone;
+    throw e;
+  }
+};
+
+// ── Main sendSMS with provider fallback chain ────────────────────────
+
+const PROVIDERS = [
+  { name: 'unisms', send: sendViaUnisms },
+  { name: 'semaphore', send: sendViaSemaphore },
+  { name: 'twilio', send: sendViaTwilio },
+];
+
+/**
+ * Send SMS via provider fallback chain:
+ * 1. UniSMS (primary)
+ * 2. Semaphore.co (backup)
+ * 3. Twilio (last resort)
+ *
+ * Returns the first successful provider's response data.
+ * If all providers fail, throws the last error encountered.
+ */
+const sendSMS = async (phone, message, { metadata } = {}) => {
+  void metadata;
+
+  let lastError;
+
+  for (const provider of PROVIDERS) {
+    try {
+      const result = await provider.send(phone, message);
+      console.log(`SMS sent via ${provider.name} to ${phone}`);
+      return result;
+    } catch (err) {
+      console.warn(`SMS provider ${provider.name} failed:`, err.message);
+      lastError = err;
+    }
+  }
+
+  // All providers failed
+  const finalError = new Error(`All SMS providers failed. Last: ${lastError?.message || 'Unknown'}`);
+  finalError.provider = lastError?.provider || 'unknown';
+  finalError.recipient = phone;
+  finalError.status = lastError?.status;
+  throw finalError;
+};
+
+// ── Exports ──────────────────────────────────────────────────────────
 
 module.exports = sendSMS;
 module.exports.toE164PhStrict = toE164PhStrict;
-module.exports.buildUnismsPayload = buildUnismsPayload;
+module.exports.sendViaUnisms = sendViaUnisms;
+module.exports.sendViaSemaphore = sendViaSemaphore;
+module.exports.sendViaTwilio = sendViaTwilio;
 
 

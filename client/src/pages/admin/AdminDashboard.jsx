@@ -18,9 +18,9 @@ import { Link } from 'react-router-dom';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
 import ScreenLoader from '../../components/ScreenLoader.jsx';
 import {
+  computeEndTimeLabel,
   formatDateKey,
   formatServiceLabel,
-  formatTimeFromDateValue,
   formatTimeLabel,
   getStatusTone,
 } from '../../utils/schedule.js';
@@ -428,8 +428,12 @@ function AdminDashboard() {
                                   <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Time</p>
                                   <p className="mt-1 line-clamp-2 break-words text-lg font-semibold text-maastricht dark:text-slate-100">
                                     {formatTimeLabel(appointment.time)}
-                                    <span className="text-police dark:text-slate-300">{appointment.scheduledEnd ? ' to ' : ''}</span>
-                                    {appointment.scheduledEnd ? formatTimeFromDateValue(appointment.scheduledEnd) : ''}
+                                    <span className="text-police dark:text-slate-300">
+                                      {appointment.time && appointment.durationMinutes ? ' to ' : ''}
+                                    </span>
+                                    {appointment.time && appointment.durationMinutes
+                                      ? computeEndTimeLabel(appointment.time, appointment.durationMinutes)
+                                      : ''}
                                   </p>
                                 </div>
 
@@ -529,8 +533,12 @@ function AdminDashboard() {
                             <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Time</p>
                             <p className="mt-1 text-lg font-semibold text-maastricht dark:text-slate-100">
                               {formatDateKey(appointment.dateKey, { month: 'long', day: 'numeric', year: 'numeric' })} at {formatTimeLabel(appointment.time)}
-                              <span className="text-police dark:text-slate-300">{appointment.scheduledEnd ? ' to ' : ''}</span>
-                              {appointment.scheduledEnd ? formatTimeFromDateValue(appointment.scheduledEnd) : ''}
+                              <span className="text-police dark:text-slate-300">
+                                {appointment.time && appointment.durationMinutes ? ' to ' : ''}
+                              </span>
+                              {appointment.time && appointment.durationMinutes
+                                ? computeEndTimeLabel(appointment.time, appointment.durationMinutes)
+                                : ''}
                             </p>
                           </div>
                         </div>

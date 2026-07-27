@@ -6,7 +6,7 @@
  */
 const assert = require('assert');
 
-const { toE164PhStrict, buildUnismsPayload } = require('./sendSMS');
+const { toE164PhStrict } = require('./sendSMS');
 
 const test = (name, fn) => {
   try {
@@ -32,38 +32,7 @@ test('toE164PhStrict: keeps already valid +63 E.164', () => {
 });
 
 test('toE164PhStrict: rejects invalid format', () => {
-  assert.throws(() => toE164PhStrict('08123456789'), /Invalid phone number format/);
-});
-
-test('buildUnismsPayload: includes required fields including sender_id', () => {
-  const { payload, recipient } = buildUnismsPayload({
-    phone: '09123456789',
-    content: 'Hello',
-    senderId: 'UniSMS',
-    metadata: { order_id: '12345', template: 'order_confirmation' },
-  });
-
-  assert.strictEqual(recipient, '+639123456789');
-  assert.strictEqual(payload.recipient, '+639123456789');
-  assert.strictEqual(payload.content, 'Hello');
-  assert.strictEqual(payload.sender_id, 'UniSMS');
-  assert.deepStrictEqual(payload.metadata, {
-    order_id: '12345',
-    template: 'order_confirmation',
-  });
-});
-
-test('buildUnismsPayload: metadata omitted when not provided', () => {
-  const { payload } = buildUnismsPayload({
-    phone: '09123456789',
-    content: 'Hello',
-    senderId: 'UniSMS',
-  });
-
-  assert.strictEqual(payload.recipient, '+639123456789');
-  assert.strictEqual(payload.content, 'Hello');
-  assert.strictEqual(payload.sender_id, 'UniSMS');
-  assert.strictEqual(Object.prototype.hasOwnProperty.call(payload, 'metadata'), false);
+  assert.throws(() => toE164PhStrict('08123456789'), /Invalid PH phone number/);
 });
 
 if (process.exitCode) {

@@ -10,7 +10,6 @@ function ProtectedRoute({ children }) {
 
     const verifyAdmin = async () => {
       try {
-        const token = null;
         const response = await api.get('/api/admin/check-auth');
         if (isMounted) {
           setIsAuth(Boolean(response?.data?.authenticated));
