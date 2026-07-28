@@ -119,7 +119,7 @@ function BlockDates() {
       <div className="space-y-3">
         {dates.map((item) => (
           <div
-            key={item._id}
+            key={item.id}
             className="flex items-center justify-between rounded-[24px] bg-white p-4 shadow-sm"
           >
             <div>
@@ -141,7 +141,7 @@ function BlockDates() {
 
             <button
               type="button"
-              onClick={() => handleDelete(item._id)}
+              onClick={() => handleDelete(item.id)}
               className="text-red-500 transition hover:text-red-700"
               aria-label="Delete blocked date"
             >

@@ -1,4 +1,3 @@
-import axios from 'axios';
 import {
   BarChart3,
   CalendarDays,
@@ -14,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import DarkModeToggle from './DarkModeToggle.jsx';
+import api from '../api.js';
 
 function Navbar() {
   const location = useLocation();
@@ -29,7 +29,7 @@ function Navbar() {
 
   const handleLogout = async () => {
     try {
-      await axios.post('/api/admin/logout');
+      await api.post('/api/admin/logout');
       navigate('/admin/login');
     } catch (error) {
       console.error('Logout failed:', error);

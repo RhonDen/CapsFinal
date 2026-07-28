@@ -1,6 +1,6 @@
-import axios from 'axios';
 import { ArrowLeft, LogOut } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import api from '../../api.js';
 
 function AdminPageShell({
   title,
@@ -17,7 +17,7 @@ function AdminPageShell({
 
   const handleLogout = async () => {
     try {
-      await axios.post('/api/admin/logout');
+      await api.post('/api/admin/logout');
       navigate('/admin/login');
     } catch (error) {
       console.error('Logout failed:', error);
