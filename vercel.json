@@ -1,5 +1,11 @@
 {
+  "outputDirectory": "client/dist",
+  "buildCommand": "npm run build",
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://capsfinal.onrender.com/api/$1"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

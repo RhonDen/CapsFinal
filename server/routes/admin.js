@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -237,10 +237,13 @@ router.post(
 );
 
 router.post('/logout', auth, (req, res) => {
+  const isProd = process.env.NODE_ENV === 'production';
+
   res.clearCookie('admin_token', {
     httpOnly: true,
-    secure: false,
-    sameSite: 'lax',
+    path: '/',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
   });
 
 
@@ -352,7 +355,7 @@ router.get(
 
     const { from, to, status, phone, search } = req.query;
 
-    // ── SEARCH MODE ──
+    // â”€â”€ SEARCH MODE â”€â”€
     // If search text is provided, ignore date filters and search ALL records.
     if (search && search.trim()) {
       const q = search.trim();
@@ -380,7 +383,7 @@ router.get(
       });
     }
 
-    // ── NORMAL FILTER MODE ──
+    // â”€â”€ NORMAL FILTER MODE â”€â”€
     const digitsOnlyPhone = phone ? String(phone).replace(/\D/g, '').trim() : '';
     const phoneToMatch = digitsOnlyPhone ? digitsOnlyPhone.slice(0, 11) : '';
 
@@ -672,7 +675,7 @@ router.get(
   })
 );
 
-// ── Client Appointments Endpoint ──
+// â”€â”€ Client Appointments Endpoint â”€â”€
 router.get(
   '/clients/:number/appointments',
   auth,
@@ -707,14 +710,14 @@ router.get(
   })
 );
 
-// ── Walk-in Route ──────────────────────────────────────────────────────
+// â”€â”€ Walk-in Route â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.post(
   '/walk-in',
   auth,
   asyncHandler(async (req, res) => {
     const { number, lastName, firstName, middleInitial, service, date, time, email, notes } = req.body;
     
-    // Only require essential fields — email, notes, middleInitial are optional
+    // Only require essential fields â€” email, notes, middleInitial are optional
     if (!number || !lastName || !firstName || !service || !date || !time) {
       return res.status(400).json({ error: 'Required fields: phone number, last name, first name, service, date, and time.' });
     }
@@ -773,7 +776,7 @@ router.post(
   })
 );
 
-// ── Helpers ─────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const toAppointmentDate = (obj) => {
   if (!obj) return null;
   // Try date field (string like "2026-06-26 16:00:00.000 +00:00")
@@ -796,7 +799,7 @@ const toAppointmentDate = (obj) => {
 
 const ANALYTICS_STATUSES = ['completed', 'notCompleted', 'accepted', 'rejected', 'cancelled'];
 
-// ── Analytics Endpoint ──────────────────────────────────────────────────
+// â”€â”€ Analytics Endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get(
   '/analytics',
   auth,
@@ -838,7 +841,7 @@ router.get(
       .map((obj) => ({ obj, dt: toAppointmentDate(obj) }))
       .filter((x) => x.dt && x.dt >= start && x.dt < end);
 
-    // ── 1. DESCRIPTIVE ANALYTICS (What happened?) ──
+    // â”€â”€ 1. DESCRIPTIVE ANALYTICS (What happened?) â”€â”€
     const pieMap = new Map();
     const lineMap = new Map();
     const barMap = new Map();
@@ -889,7 +892,7 @@ router.get(
       .map(([hour, count]) => ({ hour: hour + ':00', count }))
       .sort((a, b) => parseInt(a.hour) - parseInt(b.hour));
 
-    // ── 2. DIAGNOSTIC ANALYTICS (Why did it happen?) ──
+    // â”€â”€ 2. DIAGNOSTIC ANALYTICS (Why did it happen?) â”€â”€
     const dowMap = new Map();
     const serviceDowMap = new Map();
     for (const { obj, dt } of appointmentsInRange) {
@@ -912,7 +915,7 @@ router.get(
       serviceDowCorrelation.push({ service: svc, day, count });
     }
 
-    // ── 3. PREDICTIVE ANALYTICS (What might happen?) ──
+    // â”€â”€ 3. PREDICTIVE ANALYTICS (What might happen?) â”€â”€
     let predictiveForecast = [];
     if (analysisType === 'monthly') {
       const threeMonthsAgo = new Date(start);
@@ -951,7 +954,7 @@ router.get(
       ];
     }
 
-    // ── 4. PRESCRIPTIVE ANALYTICS (What should we do?) ──
+    // â”€â”€ 4. PRESCRIPTIVE ANALYTICS (What should we do?) â”€â”€
     const recommendations = [];
 
     const sortedDow = [...dayOfWeekBreakdown].sort((a, b) => a.count - b.count);
@@ -1016,7 +1019,7 @@ router.get(
       }
     }
 
-    // ── 5. COMPARISON: Period-over-period ──
+    // â”€â”€ 5. COMPARISON: Period-over-period â”€â”€
     let comparison = null;
     if (analysisType === 'monthly') {
       const prevStart = new Date(start);
@@ -1050,7 +1053,7 @@ router.get(
       };
     }
 
-    // ── 7. REJECTION ANALYSIS (Why are appointments not completed?) ──
+    // â”€â”€ 7. REJECTION ANALYSIS (Why are appointments not completed?) â”€â”€
     const rejectionByService = new Map();
     const notCompletedByService = new Map();
     for (const { obj } of appointmentsInRange) {
@@ -1071,7 +1074,7 @@ router.get(
         .sort((a, b) => b.count - a.count),
     };
 
-    // ── 8. STATUS CHANGE TIMELINE ──
+    // â”€â”€ 8. STATUS CHANGE TIMELINE â”€â”€
     const statusTimelineMap = new Map();
     for (const { obj, dt } of appointmentsInRange) {
       if (!dt) continue;
@@ -1086,7 +1089,7 @@ router.get(
     }
     const statusTimeline = Array.from(statusTimelineMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
-    // ── 9. SERVICE POPULARITY TREND (month-over-month) ──
+    // â”€â”€ 9. SERVICE POPULARITY TREND (month-over-month) â”€â”€
     let serviceTrend = [];
     if (analysisType === 'monthly') {
       const serviceMonthMap = new Map();
@@ -1135,7 +1138,7 @@ router.get(
       });
     }
 
-    // ── 10. WALK-IN VS ONLINE BOOKING COMPARISON ──
+    // â”€â”€ 10. WALK-IN VS ONLINE BOOKING COMPARISON â”€â”€
     let walkInVsOnline = null;
     {
       const walkInCount = appointmentsInRange.filter(({ obj }) => obj.isWalkIn).length;
