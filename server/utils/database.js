@@ -8,12 +8,27 @@ const database = process.env.DB_NAME || 'appointease';
 const username = process.env.DB_USER || 'root';
 const password = process.env.DB_PASSWORD || '';
 const sqliteStorage = process.env.SQLITE_STORAGE || path.join(__dirname, '..', 'database.sqlite');
+const postgresUri = process.env.POSTGRES_URI || '';
 
 let sequelize;
 if (dialect === 'sqlite') {
   sequelize = new Sequelize({
     dialect: 'sqlite',
     storage: sqliteStorage,
+    logging: false,
+    define: {
+      timestamps: true,
+    },
+  });
+} else if (dialect === 'postgres') {
+  sequelize = new Sequelize(postgresUri, {
+    dialect: 'postgres',
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false, // Required for Neon/Vercel Postgres SSL
+      },
+    },
     logging: false,
     define: {
       timestamps: true,
@@ -47,16 +62,17 @@ async function connectDatabase() {
 
     return {
       mode: dialect,
-      uri: dialect === 'sqlite' ? sqliteStorage : `${username}@${host}:${port}/${database}`,
+      uri: dialect === 'sqlite' ? sqliteStorage : dialect === 'postgres' ? postgresUri : `${username}@${host}:${port}/${database}`,
     };
   } catch (error) {
-    // Production safety: do not silently fall back from MySQL.
+    // Production safety: do not silently fall back.
     if (dialect === 'mysql') {
       console.error('MySQL connection error:', error);
-      throw error;
+    } else if (dialect === 'postgres') {
+      console.error('PostgreSQL connection error:', error);
+    } else {
+      console.error('Database connection error:', error);
     }
-
-    console.error('Database connection error:', error);
     throw error;
   }
 }

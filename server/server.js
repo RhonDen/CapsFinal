@@ -124,11 +124,13 @@ const startServer = async () => {
     app.use('/api/admin', adminRoute);
     app.use('/api/public', publicBlockedDatesRoute);
 
-    console.log(
-      database.mode === 'sqlite'
-        ? `Connected to SQLite at ${database.uri}`
-        : `Connected to MySQL at ${database.uri}`
-    );
+    if (database.mode === 'sqlite') {
+      console.log(`Connected to SQLite at ${database.uri}`);
+    } else if (database.mode === 'postgres') {
+      console.log('Connected to PostgreSQL (Vercel Postgres / Neon)');
+    } else {
+      console.log(`Connected to MySQL at ${database.uri}`);
+    }
 
     const port = Number(process.env.PORT) || 5000;
     const server = app.listen(port, () => {
