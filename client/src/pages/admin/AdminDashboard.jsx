@@ -9,6 +9,7 @@ import {
   Mail,
   UserPlus,
   Users,
+  X,
   XCircle,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -84,6 +85,8 @@ function AdminDashboard() {
   const [error, setError] = useState('');
   const [statusLoadingId, setStatusLoadingId] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [rejectModal, setRejectModal] = useState({ open: false, appointmentId: null });
+  const [rejectionReason, setRejectionReason] = useState('');
 
   useEffect(() => {
     let intervalId = null;
@@ -136,7 +139,7 @@ function AdminDashboard() {
     };
   }, []);
 
-  const updateStatus = async (appointmentId, status) => {
+  const updateStatus = async (appointmentId, status, reason = '') => {
     if (actionLoading) return;
 
     const numericId = String(appointmentId ?? '');
@@ -150,9 +153,13 @@ function AdminDashboard() {
     setError('');
 
     try {
+      const payload = { status };
+      if (status === 'rejected' && reason) {
+        payload.rejectionReason = reason;
+      }
       await api.patch(
         `/api/admin/appointments/${numericId}/status`,
-        { status }
+        payload
       );
       await fetchDashboard(false);
     } catch (requestError) {
@@ -162,6 +169,13 @@ function AdminDashboard() {
       setStatusLoadingId('');
       setActionLoading(false);
     }
+  };
+
+  const handleRejectWithReason = async () => {
+    if (!rejectModal.appointmentId) return;
+    await updateStatus(rejectModal.appointmentId, 'rejected', rejectionReason);
+    setRejectModal({ open: false, appointmentId: null });
+    setRejectionReason('');
   };
 
   const fetchDashboard = useMemo(() => {
@@ -353,7 +367,7 @@ function AdminDashboard() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => updateStatus(appointment.id, 'rejected')}
+                            onClick={() => setRejectModal({ open: true, appointmentId: appointment.id })}
                             disabled={statusLoadingId === `${appointment.id}:rejected`}
                             className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-600 px-5 py-3 text-base font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
                           >
@@ -568,6 +582,47 @@ function AdminDashboard() {
           </>
         )}
       </div>
+      {/* ── Rejection Reason Modal ── */}
+      {rejectModal.open && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-maastricht">Rejection Reason</h3>
+              <button
+                onClick={() => { setRejectModal({ open: false, appointmentId: null }); setRejectionReason(''); }}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-police">
+              Provide a reason for rejecting this appointment. This will be included in the SMS notification sent to the patient.
+            </p>
+            <textarea
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder="e.g., Slot unavailable, schedule conflict..."
+              rows={4}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-police placeholder:text-slate-400 focus:border-silver-lake focus:outline-none focus:ring-4 focus:ring-silver-lake/15"
+            />
+            <div className="mt-4 flex gap-3">
+              <button
+                onClick={() => { setRejectModal({ open: false, appointmentId: null }); setRejectionReason(''); }}
+                className="flex-1 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-police transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRejectWithReason}
+                disabled={!rejectionReason.trim() || actionLoading}
+                className="flex-1 rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {actionLoading ? 'Rejecting...' : 'Reject & Notify'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminPageShell>
   );
 }

@@ -1,5 +1,5 @@
 import api from '../../api.js';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, Info } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Bar,
@@ -23,7 +23,7 @@ import {
   getLocalDateKey,
 } from '../../utils/schedule.js';
 
-const COLORS = ['#0C243D', '#27496A', '#5C8EB4', '#9AB7CD', '#C1D1DB'];
+const COLORS = ['#0C243D', '#27496A', '#5C8EB4', '#9AB7CD', '#C1D1DB', '#E8A87C', '#95D5B2', '#F4A261'];
 
 const ANALYSIS_TYPES = [
   { value: 'daily', label: 'Daily' },
@@ -47,6 +47,36 @@ const MONTH_OPTIONS = [
   { value: 11, label: 'November' },
   { value: 12, label: 'December' },
 ];
+
+// Custom tooltip for pie chart with percentage
+const PieTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const total = payload[0].payload.total || 0;
+    const pct = total > 0 ? ((data.value / total) * 100).toFixed(1) : 0;
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-lg">
+        <p className="text-sm font-semibold text-maastricht">{data.name}</p>
+        <p className="text-sm text-police">{data.value} appointments ({pct}%)</p>
+      </div>
+    );
+  }
+  return null;
+};
+
+// Custom label for pie chart showing percentage
+const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
+  const RADIAN = Math.PI / 180;
+  const radius = outerRadius + 30;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  const pct = (percent * 100).toFixed(1);
+  return (
+    <text x={x} y={y} fill="#374151" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs">
+      {`${name} (${pct}%)`}
+    </text>
+  );
+};
 
 function DataAnalysis() {
   const now = new Date();
@@ -131,9 +161,17 @@ function DataAnalysis() {
           response.data.predictivePie || descriptive.pie
         );
 
+        const pieData = normalizePie(descriptive.pie);
+        const totalPie = pieData.reduce((sum, item) => sum + item.value, 0);
+        const pieWithTotal = pieData.map(item => ({ ...item, total: totalPie }));
+
+        const predictivePieData = normalizedPredictivePie;
+        const totalPredictive = predictivePieData.reduce((sum, item) => sum + item.value, 0);
+        const predictivePieWithTotal = predictivePieData.map(item => ({ ...item, total: totalPredictive }));
+
         setData({
-          pie: normalizePie(descriptive.pie),
-          predictivePie: normalizedPredictivePie,
+          pie: pieWithTotal,
+          predictivePie: predictivePieWithTotal,
           line: descriptive.line || [],
           bar: (descriptive.bar || []).map((item) => ({
             ...item,
@@ -149,12 +187,11 @@ function DataAnalysis() {
           walkInVsOnline: response.data.walkInVsOnline || null,
         });
 
-        // Reset predictive selection when range changes
         if (analysisType === 'predictive') {
           setSelectedPredictiveService((prev) => {
-            const stillExists = normalizedPredictivePie.some((x) => x.name === prev);
+            const stillExists = predictivePieWithTotal.some((x) => x.name === prev);
             if (stillExists) return prev;
-            return normalizedPredictivePie[0]?.name || '';
+            return predictivePieWithTotal[0]?.name || '';
           });
         } else {
           setSelectedPredictiveService('');
@@ -210,6 +247,7 @@ function DataAnalysis() {
 
   return (
     <AdminPageShell title={title} description={description} icon={BarChart3}>
+      {/* ── Controls ── */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
           <label className="text-sm font-medium text-maastricht dark:text-slate-200">Analysis Type</label>
@@ -284,7 +322,80 @@ function DataAnalysis() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mt-6">
+      {loading ? (
+        <div className="mt-6 flex items-center justify-center py-16">
+          <div className="flex items-center gap-3 text-slate-400">
+            <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            <span className="text-sm">Loading analytics…</span>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* ── PREDICTIVE ANALYTICS (Top Priority) ── */}
+          {data.predictive && data.predictive.forecast && data.predictive.forecast.length > 0 && (
+            <div className="mt-8">
+              <div className="mb-3 flex items-center gap-2">
+                <h2 className="text-xl font-bold text-maastricht dark:text-slate-100">Predictive Analytics</h2>
+                <Info className="h-4 w-4 text-silver-lake" title="Forecast based on historical trends" />
+              </div>
+              <p className="mb-4 text-sm text-police dark:text-slate-300">
+                What might happen? — Forecast based on historical trends and demand patterns.
+              </p>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                {data.predictive.forecast.map((item, idx) => (
+                  <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-police dark:text-slate-300">{item.period}</p>
+                      {item.actual !== undefined && (
+                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-200">Actual</span>
+                      )}
+                      {item.projected !== undefined && (
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900 dark:text-amber-200">Projected</span>
+                      )}
+                    </div>
+                    <p className="mt-4 text-3xl font-bold text-maastricht dark:text-slate-100">
+                      {item.actual !== undefined ? item.actual : item.projected}
+                    </p>
+                    <p className="mt-1 text-sm text-police dark:text-slate-300">appointments</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── PERIOD COMPARISON (Top Priority) ── */}
+          {data.comparison && (
+            <div className="mt-8">
+              <div className="mb-3 flex items-center gap-2">
+                <h2 className="text-xl font-bold text-maastricht dark:text-slate-100">Period Comparison</h2>
+                <Info className="h-4 w-4 text-silver-lake" title="Compare current period vs previous" />
+              </div>
+              <p className="mb-4 text-sm text-police dark:text-slate-300">How does this period compare to the previous one?</p>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                  <p className="text-sm font-medium text-police dark:text-slate-300">{data.comparison.previous?.period || 'Previous'}</p>
+                  <p className="mt-2 text-3xl font-bold text-maastricht dark:text-slate-100">{data.comparison.previous?.count || 0}</p>
+                  <p className="mt-1 text-sm text-police dark:text-slate-300">appointments</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                  <p className="text-sm font-medium text-police dark:text-slate-300">{data.comparison.current?.period || 'Current'}</p>
+                  <p className="mt-2 text-3xl font-bold text-maastricht dark:text-slate-100">{data.comparison.current?.count || 0}</p>
+                  <p className="mt-1 text-sm text-police dark:text-slate-300">appointments</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                  <p className="text-sm font-medium text-police dark:text-slate-300">Change</p>
+                  <p className={`mt-2 text-3xl font-bold ${data.comparison.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {data.comparison.change >= 0 ? '+' : ''}{data.comparison.change}%
+                  </p>
+                  <p className="mt-1 text-sm text-police dark:text-slate-300">
+                    {data.comparison.change >= 0 ? 'increase' : 'decrease'} from previous
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
           <h2 className="mb-4 text-lg font-semibold text-maastricht dark:text-slate-100">
             {analysisType === 'predictive'
@@ -688,60 +799,7 @@ function DataAnalysis() {
         </div>
       )}
 
-      {/* ── PREDICTIVE FORECAST ── */}
-      {data.predictive && data.predictive.forecast && data.predictive.forecast.length > 0 && (
-        <div className="mt-8">
-          <h2 className="mb-2 text-xl font-bold text-maastricht dark:text-slate-100">Predictive Analytics</h2>
-          <p className="mb-4 text-sm text-police dark:text-slate-300">What might happen? — Forecast based on historical trends.</p>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {data.predictive.forecast.map((item, idx) => (
-              <div key={idx} className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-police dark:text-slate-300">{item.period}</p>
-                  {item.actual !== undefined && (
-                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-200">Actual</span>
-                  )}
-                  {item.projected !== undefined && (
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900 dark:text-amber-200">Projected</span>
-                  )}
-                </div>
-                <p className="mt-4 text-3xl font-bold text-maastricht dark:text-slate-100">
-                  {item.actual !== undefined ? item.actual : item.projected}
-                </p>
-                <p className="mt-1 text-sm text-police dark:text-slate-300">appointments</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── COMPARISON ── */}
-      {data.comparison && (
-        <div className="mt-8">
-          <h2 className="mb-2 text-xl font-bold text-maastricht dark:text-slate-100">Period Comparison</h2>
-          <p className="mb-4 text-sm text-police dark:text-slate-300">How does this period compare to the previous one?</p>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
-              <p className="text-sm font-medium text-police dark:text-slate-300">{data.comparison.previous?.period || 'Previous'}</p>
-              <p className="mt-2 text-3xl font-bold text-maastricht dark:text-slate-100">{data.comparison.previous?.count || 0}</p>
-              <p className="mt-1 text-sm text-police dark:text-slate-300">appointments</p>
-            </div>
-            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
-              <p className="text-sm font-medium text-police dark:text-slate-300">{data.comparison.current?.period || 'Current'}</p>
-              <p className="mt-2 text-3xl font-bold text-maastricht dark:text-slate-100">{data.comparison.current?.count || 0}</p>
-              <p className="mt-1 text-sm text-police dark:text-slate-300">appointments</p>
-            </div>
-            <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
-              <p className="text-sm font-medium text-police dark:text-slate-300">Change</p>
-              <p className={`mt-2 text-3xl font-bold ${data.comparison.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {data.comparison.change >= 0 ? '+' : ''}{data.comparison.change}%
-              </p>
-              <p className="mt-1 text-sm text-police dark:text-slate-300">
-                {data.comparison.change >= 0 ? 'increase' : 'decrease'} from previous
-              </p>
-            </div>
-          </div>
-        </div>
+        </>
       )}
 
     </AdminPageShell>

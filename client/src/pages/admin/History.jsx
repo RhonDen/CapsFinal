@@ -74,6 +74,8 @@ function getPatientName(row) {
   return parts.length ? parts.join(' ') : 'Unknown';
 }
 
+const ITEMS_PER_PAGE = 10;
+
 function History() {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -91,6 +93,7 @@ function History() {
   const [error, setError] = useState('');
   const [appointments, setAppointments] = useState([]);
   const [expandedPhone, setExpandedPhone] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
