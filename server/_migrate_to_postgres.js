@@ -122,8 +122,14 @@ const migrateTable = async (name, Model, pgModel) => {
 
   // Remove the 'id' field so PostgreSQL auto-generates new IDs
   // This prevents ID conflicts with existing sequences
+  // Exception: Counters table uses string 'id' as primary key, so keep it
   const records = rows.map(row => {
-    const { id, createdAt, updatedAt, ...data } = row;
+    const { createdAt, updatedAt, ...data } = row;
+    // For Counters, keep the id field (string primary key)
+    // For other tables, remove id so PG auto-generates
+    if (name !== 'Counters') {
+      delete data.id;
+    }
     // Include timestamps if they exist
     const record = { ...data };
     if (row.createdAt) record.createdAt = row.createdAt;
