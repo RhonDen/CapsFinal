@@ -21,33 +21,45 @@ if (dialect === 'sqlite') {
     },
   });
 } else if (dialect === 'postgres') {
-  // Clean the URI - remove unsupported params like channel_binding
-  let cleanUri = postgresUri;
-  if (cleanUri) {
+  // If POSTGRES_URI is not set, fall back to SQLite
+  if (!postgresUri || !postgresUri.trim()) {
+    console.warn('POSTGRES_URI not set. Falling back to SQLite.');
+    sequelize = new Sequelize({
+      dialect: 'sqlite',
+      storage: sqliteStorage,
+      logging: false,
+      define: {
+        timestamps: true,
+      },
+    });
+  } else {
+    // Clean the URI - remove unsupported params like channel_binding
+    let cleanUri = postgresUri;
     // Remove channel_binding parameter which pg driver doesn't support
     cleanUri = cleanUri.replace(/[?&]channel_binding=[^&]*/g, '');
     // Use direct connection (non-pooled) for better compatibility with Sequelize
     cleanUri = cleanUri.replace(/-pooler/, '');
-  }
-  sequelize = new Sequelize(cleanUri, {
-    dialect: 'postgres',
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false, // Required for Neon/Vercel Postgres SSL
+
+    sequelize = new Sequelize(cleanUri, {
+      dialect: 'postgres',
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false, // Required for Neon/Vercel Postgres SSL
+        },
       },
-    },
-    logging: false,
-    define: {
-      timestamps: true,
-    },
-    pool: {
-      max: 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000,
-    },
-  });
+      logging: false,
+      define: {
+        timestamps: true,
+      },
+      pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000,
+      },
+    });
+  }
 } else {
   sequelize = new Sequelize(database, username, password, {
     host,
