@@ -6,7 +6,7 @@ const Appointment = sequelize.define(
   'Appointment',
   {
     id: {
-      type: DataTypes.BIGINT.UNSIGNED,
+      type: DataTypes.BIGINT,
       autoIncrement: true,
       primaryKey: true,
     },

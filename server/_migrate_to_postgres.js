@@ -52,55 +52,57 @@ const pg = new Sequelize(pgUri, {
 // (which might have dialect-specific issues).
 
 const defineModels = (sequelize) => {
+  const DataTypes = require('sequelize').DataTypes;
+  
   const Appointment = sequelize.define('Appointment', {
-    id: { type: require('sequelize').DataTypes.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
-    serialNumber: { type: require('sequelize').DataTypes.INTEGER, unique: true, allowNull: true },
-    number: { type: require('sequelize').DataTypes.STRING, allowNull: false },
-    lastName: { type: require('sequelize').DataTypes.STRING, allowNull: false },
-    firstName: { type: require('sequelize').DataTypes.STRING, allowNull: false },
-    middleInitial: { type: require('sequelize').DataTypes.STRING, allowNull: true },
-    service: { type: require('sequelize').DataTypes.STRING, allowNull: false },
-    email: { type: require('sequelize').DataTypes.STRING, allowNull: true },
-    date: { type: require('sequelize').DataTypes.DATE, allowNull: true },
-    dateKey: { type: require('sequelize').DataTypes.STRING, allowNull: true },
-    time: { type: require('sequelize').DataTypes.STRING, allowNull: true },
-    durationMinutes: { type: require('sequelize').DataTypes.INTEGER, allowNull: true },
-    scheduledStart: { type: require('sequelize').DataTypes.DATE, allowNull: true },
-    scheduledEnd: { type: require('sequelize').DataTypes.DATE, allowNull: true },
-    status: { type: require('sequelize').DataTypes.STRING, defaultValue: 'pending' },
-    otp: { type: require('sequelize').DataTypes.STRING, allowNull: true },
-    otpExpires: { type: require('sequelize').DataTypes.DATE, allowNull: true },
-    verifiedAt: { type: require('sequelize').DataTypes.DATE, allowNull: true },
-    notes: { type: require('sequelize').DataTypes.TEXT, allowNull: true },
-    isWalkIn: { type: require('sequelize').DataTypes.BOOLEAN, defaultValue: false },
-    historyOtp: { type: require('sequelize').DataTypes.STRING, allowNull: true },
-    historyOtpExpires: { type: require('sequelize').DataTypes.DATE, allowNull: true },
+    id: { type: DataTypes.BIGINT, autoIncrement: true, primaryKey: true },
+    serialNumber: { type: DataTypes.INTEGER, unique: true, allowNull: true },
+    number: { type: DataTypes.STRING, allowNull: false },
+    lastName: { type: DataTypes.STRING, allowNull: false },
+    firstName: { type: DataTypes.STRING, allowNull: false },
+    middleInitial: { type: DataTypes.STRING, allowNull: true },
+    service: { type: DataTypes.STRING, allowNull: false },
+    email: { type: DataTypes.STRING, allowNull: true },
+    date: { type: DataTypes.DATE, allowNull: true },
+    dateKey: { type: DataTypes.STRING, allowNull: true },
+    time: { type: DataTypes.STRING, allowNull: true },
+    durationMinutes: { type: DataTypes.INTEGER, allowNull: true },
+    scheduledStart: { type: DataTypes.DATE, allowNull: true },
+    scheduledEnd: { type: DataTypes.DATE, allowNull: true },
+    status: { type: DataTypes.STRING, defaultValue: 'pending' },
+    otp: { type: DataTypes.STRING, allowNull: true },
+    otpExpires: { type: DataTypes.DATE, allowNull: true },
+    verifiedAt: { type: DataTypes.DATE, allowNull: true },
+    notes: { type: DataTypes.TEXT, allowNull: true },
+    isWalkIn: { type: DataTypes.BOOLEAN, defaultValue: false },
+    historyOtp: { type: DataTypes.STRING, allowNull: true },
+    historyOtpExpires: { type: DataTypes.DATE, allowNull: true },
   }, { tableName: 'Appointments', timestamps: true });
 
   const Admin = sequelize.define('Admin', {
-    id: { type: require('sequelize').DataTypes.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
-    username: { type: require('sequelize').DataTypes.STRING, allowNull: false, unique: true },
-    passwordHash: { type: require('sequelize').DataTypes.STRING, allowNull: false },
+    id: { type: DataTypes.BIGINT, autoIncrement: true, primaryKey: true },
+    username: { type: DataTypes.STRING, allowNull: false, unique: true },
+    passwordHash: { type: DataTypes.STRING, allowNull: false },
   }, { tableName: 'Admins', timestamps: true });
 
   const BlockedDate = sequelize.define('BlockedDate', {
-    id: { type: require('sequelize').DataTypes.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
-    date: { type: require('sequelize').DataTypes.DATE, allowNull: false },
-    reason: { type: require('sequelize').DataTypes.STRING, allowNull: true },
+    id: { type: DataTypes.BIGINT, autoIncrement: true, primaryKey: true },
+    date: { type: DataTypes.DATE, allowNull: false },
+    reason: { type: DataTypes.STRING, allowNull: true },
   }, { tableName: 'BlockedDates', timestamps: true });
 
   const ContactMessage = sequelize.define('ContactMessage', {
-    id: { type: require('sequelize').DataTypes.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
-    name: { type: require('sequelize').DataTypes.STRING(150), allowNull: false },
-    email: { type: require('sequelize').DataTypes.STRING(255), allowNull: false },
-    message: { type: require('sequelize').DataTypes.TEXT, allowNull: false },
-    read: { type: require('sequelize').DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
-    ipAddress: { type: require('sequelize').DataTypes.STRING(100), allowNull: true },
+    id: { type: DataTypes.BIGINT, autoIncrement: true, primaryKey: true },
+    name: { type: DataTypes.STRING(150), allowNull: false },
+    email: { type: DataTypes.STRING(255), allowNull: false },
+    message: { type: DataTypes.TEXT, allowNull: false },
+    read: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    ipAddress: { type: DataTypes.STRING(100), allowNull: true },
   }, { tableName: 'ContactMessages', timestamps: true });
 
   const Counter = sequelize.define('Counter', {
-    id: { type: require('sequelize').DataTypes.STRING, primaryKey: true },
-    seq: { type: require('sequelize').DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    id: { type: DataTypes.STRING, primaryKey: true },
+    seq: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   }, { tableName: 'Counters', timestamps: true });
 
   return { Appointment, Admin, BlockedDate, ContactMessage, Counter };
@@ -211,4 +213,3 @@ const run = async () => {
 };
 
 run();
-
