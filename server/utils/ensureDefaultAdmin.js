@@ -1,6 +1,15 @@
 const bcrypt = require('bcryptjs');
 
-// Create a default admin automatically in local development when no admin account exists yet.
+/**
+ * Ensures a default admin account exists in the database.
+ *
+ * In production (Vercel), credentials are read from environment variables:
+ *   DEFAULT_ADMIN_USERNAME  (default: "admin")
+ *   DEFAULT_ADMIN_PASSWORD  (default: "admin123")
+ *
+ * ⚠️ IMPORTANT: On Vercel, set DEFAULT_ADMIN_PASSWORD to a strong password
+ *    via the Vercel Dashboard (Project Settings → Environment Variables).
+ */
 async function ensureDefaultAdmin() {
   // Require the model lazily after the DB connection is established to avoid circular
   // dependency issues where models import the DB before it's initialized.
@@ -19,8 +28,9 @@ async function ensureDefaultAdmin() {
 
   await Admin.create({ username, passwordHash });
 
+  const env = process.env.NODE_ENV || 'development';
   console.log(
-    `Default admin created: username=${username}, password=${password}`
+    `Default admin created (${env}): username=${username}, password=${password}`
   );
 }
 
