@@ -34,7 +34,10 @@ if (dialect === 'sqlite') {
     });
   } else {
     // Clean the URI - remove unsupported params like channel_binding
-    let cleanUri = postgresUri;
+    let cleanUri = postgresUri.trim();
+    // Strip "psql '...'" wrapper if someone pasted the CLI command
+    cleanUri = cleanUri.replace(/^psql\s+'/, '');
+    cleanUri = cleanUri.replace(/'$/, '');
     // Remove channel_binding parameter which pg driver doesn't support
     cleanUri = cleanUri.replace(/[?&]channel_binding=[^&]*/g, '');
     // Use direct connection (non-pooled) for better compatibility with Sequelize
