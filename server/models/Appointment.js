@@ -34,6 +34,7 @@ const Appointment = sequelize.define(
     isWalkIn: { type: DataTypes.BOOLEAN, defaultValue: false },
     historyOtp: { type: DataTypes.STRING, allowNull: true },
     historyOtpExpires: { type: DataTypes.DATE, allowNull: true },
+    rejectionReason: { type: DataTypes.TEXT, allowNull: true },
   },
   {
     tableName: 'Appointments',

@@ -12,16 +12,34 @@ import {
   Users,
 } from 'lucide-react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import DarkModeToggle from './DarkModeToggle.jsx';
 import api from '../api.js';
 
 function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const isAdminRoute = location.pathname.startsWith('/admin');
-
   const isAdminLogin = location.pathname === '/admin/login';
+
+  useEffect(() => {
+    if (!isAdminRoute || isAdminLogin) return;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await api.get('/api/contact/messages/unread-count');
+        setUnreadCount(response.data.count || 0);
+      } catch {
+        // Silently fail
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [isAdminRoute, isAdminLogin]);
 
   if (!isAdminRoute || isAdminLogin) {
     return null;
@@ -40,7 +58,7 @@ function Navbar() {
     { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/admin/block-dates', label: 'Block Dates', icon: CalendarX },
     { to: '/admin/clients', label: 'Clients', icon: Users },
-    { to: '/admin/inbox', label: 'Inbox', icon: Mail },
+    { to: '/admin/inbox', label: 'Inbox', icon: Mail, badge: unreadCount },
     { to: '/admin/walk-in', label: 'Walk-in', icon: UserPlus },
     { to: '/admin/data-analysis', label: 'Analytics', icon: BarChart3 },
   ];
@@ -58,22 +76,21 @@ function Navbar() {
 
         <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
           <div className="flex items-center gap-2 text-sm text-periwinkle">
-
             <ShieldCheck className="h-4 w-4 text-silver-lake" />
             <span>Protected admin workspace</span>
           </div>
 
-
           <div className="flex flex-wrap gap-2 lg:justify-end">
             {navItems.map((item) => {
               const Icon = item.icon;
+              const hasBadge = item.badge !== undefined && item.badge > 0;
 
               return (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   className={({ isActive }) =>
-                    `inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                    `relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
                       isActive
                         ? 'bg-silver-lake text-white'
                         : 'bg-white/5 text-periwinkle hover:bg-white/10 hover:text-white'
@@ -82,18 +99,19 @@ function Navbar() {
                 >
                   <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
+                  {hasBadge && (
+                    <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}
           </div>
-
-
         </div>
-
       </div>
     </nav>
   );
 }
-
 
 export default Navbar;

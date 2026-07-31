@@ -1,14 +1,9 @@
 import api from '../../api.js';
 import { ArrowLeft, Mail, MessageSquare, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
 
-
-
-const getAuthHeaders = () => ({});
-
 const formatMessageMeta = (dateValue) => {
-
   const date = new Date(dateValue);
   const today = new Date();
   const isToday = date.toDateString() === today.toDateString();
@@ -23,42 +18,35 @@ const formatMessageMeta = (dateValue) => {
 function Inbox() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState('');
   const [activeMessageId, setActiveMessageId] = useState('');
-
-
-
-
-
-
-
   const [query, setQuery] = useState('');
 
-
-
+  const fetchMessages = useCallback(async () => {
+    try {
+      const response = await api.get(`/api/contact/messages`);
+      setMessages(response.data.messages || []);
+      setError('');
+    } catch (requestError) {
+      if (!loading) {
+        setError(requestError.response?.data?.error || 'Unable to load inbox.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [loading]);
 
   useEffect(() => {
-    const fetchMessages = async () => {
-      try {
-        const response = await api.get(`/api/contact/messages`);
-        setMessages(response.data.messages || []);
-
-      } catch (requestError) {
-        setError(requestError.response?.data?.error || 'Unable to load inbox.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchMessages();
-  }, []);
+    const interval = setInterval(fetchMessages, 15000);
+    return () => clearInterval(interval);
+  }, [fetchMessages]);
 
+  const unreadCount = useMemo(() => messages.filter(m => !m.read).length, [messages]);
 
   const sortedMessages = useMemo(
     () =>
       [...messages].sort((left, right) => {
-        // Unread first
         if (!!left.read !== !!right.read) return left.read ? 1 : -1;
         return new Date(right.createdAt) - new Date(left.createdAt);
       }),
@@ -66,19 +54,17 @@ function Inbox() {
   );
 
   const activeMessage = useMemo(
-    () => sortedMessages.find((message) => message._id === activeMessageId) || null,
+    () => sortedMessages.find((message) => message.id === activeMessageId) || null,
     [activeMessageId, sortedMessages]
   );
 
   const markAsRead = async (messageId) => {
     if (!messageId) return;
-
     try {
       await api.patch(`/api/contact/messages/${messageId}/read`);
-
       setMessages((current) =>
         current.map((message) =>
-          message._id === messageId ? { ...message, read: true } : message
+          message.id === messageId ? { ...message, read: true } : message
         )
       );
     } catch (requestError) {
@@ -88,7 +74,7 @@ function Inbox() {
 
   useEffect(() => {
     if (activeMessage && !activeMessage.read) {
-      markAsRead(activeMessage._id);
+      markAsRead(activeMessage.id);
     }
   }, [activeMessage]);
 
@@ -118,14 +104,22 @@ function Inbox() {
               <h2 className="text-lg font-semibold text-slate-900">Patient messages</h2>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
-            <Search className="h-4 w-4" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name/email/message"
-              className="w-60 bg-transparent text-sm outline-none placeholder:text-slate-400"
-            />
+          <div className="flex items-center gap-4">
+            {unreadCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+                <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                {unreadCount} unread
+              </span>
+            )}
+            <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
+              <Search className="h-4 w-4" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name/email/message"
+                className="w-60 bg-transparent text-sm outline-none placeholder:text-slate-400"
+              />
+            </div>
           </div>
         </div>
 
@@ -147,6 +141,9 @@ function Inbox() {
               <div className="w-full border-b border-slate-200 bg-white lg:w-[360px] lg:border-b-0 lg:border-r">
                 <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
                   {messages.length} message{messages.length === 1 ? '' : 's'}
+                  {unreadCount > 0 && (
+                    <span className="ml-2 font-semibold text-red-600">({unreadCount} new)</span>
+                  )}
                 </div>
 
                 <div className="max-h-[480px] overflow-y-auto">
@@ -162,18 +159,25 @@ function Inbox() {
 
                     return (
                       <button
-                        key={message._id}
+                        key={message.id}
                         type="button"
-                        onClick={() => setActiveMessageId(message._id)}
-                        className="flex w-full border-b border-slate-200 px-4 py-3 text-left transition hover:bg-slate-50"
+                        onClick={() => setActiveMessageId(message.id)}
+                        className={`flex w-full border-b border-slate-200 px-4 py-3 text-left transition hover:bg-slate-50 ${
+                          !message.read ? 'bg-blue-50/50' : ''
+                        }`}
                       >
                         <div className="flex min-w-0 flex-1 items-start gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ${
+                            !message.read ? 'bg-blue-600' : 'bg-slate-900'
+                          }`}>
                             {message.name?.charAt(0)?.toUpperCase() || 'M'}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
                               <p className={`truncate text-sm ${message.read ? 'font-medium text-slate-700' : 'font-semibold text-slate-900'}`}>
+                                {!message.read && (
+                                  <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-blue-500" />
+                                )}
                                 {message.name}
                               </p>
                               <span className="shrink-0 text-[11px] text-slate-500">{meta}</span>

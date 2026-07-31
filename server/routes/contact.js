@@ -81,6 +81,15 @@ router.get(
   })
 );
 
+router.get(
+  '/messages/unread-count',
+  auth,
+  asyncHandler(async (req, res) => {
+    const count = await ContactMessage.count({ where: { read: false } });
+    return res.json({ count });
+  })
+);
+
 router.patch(
   '/messages/:id/read',
   auth,

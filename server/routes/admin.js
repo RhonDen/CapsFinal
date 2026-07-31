@@ -454,6 +454,10 @@ router.patch(
     body('status')
       .isIn(['accepted', 'rejected', 'completed', 'notCompleted', 'cancelled'])
       .withMessage('Invalid appointment status.'),
+    body('rejectionReason')
+      .optional()
+      .isString()
+      .withMessage('Rejection reason must be a string.'),
   ],
   asyncHandler(async (req, res) => {
     if (!validate(req, res)) {
@@ -470,7 +474,7 @@ router.patch(
       return res.status(400).json({ error: 'This booking is still waiting for OTP verification.' });
     }
 
-    const { status } = req.body;
+    const { status, rejectionReason } = req.body;
     const appointmentWindow = getAppointmentWindow(appointment);
 
     if ((status === 'accepted' || status === 'rejected') && appointment.status !== 'pending') {
@@ -528,6 +532,9 @@ router.patch(
     }
 
     appointment.status = status;
+    if (status === 'rejected' && rejectionReason) {
+      appointment.rejectionReason = rejectionReason;
+    }
     await appointment.save();
 
     const statusSmsBuilders = {
@@ -537,8 +544,10 @@ router.patch(
           entry.time
         )}. Thank you.`;
       },
-      rejected: (entry) =>
-        `Your appointment on ${entry.dateKey} at ${formatTimeLabel(entry.time)} was rejected.`,
+      rejected: (entry) => {
+        const reason = entry.rejectionReason ? ` Reason: ${entry.rejectionReason}` : '';
+        return `Your appointment on ${entry.dateKey} at ${formatTimeLabel(entry.time)} was rejected.${reason}`;
+      },
       completed: () => 'Your appointment has been marked as completed. Thank you.',
       notCompleted: () =>
         'Your appointment has been marked as not completed. Please contact the clinic if needed.',
