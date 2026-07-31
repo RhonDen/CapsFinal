@@ -21,7 +21,15 @@ if (dialect === 'sqlite') {
     },
   });
 } else if (dialect === 'postgres') {
-  sequelize = new Sequelize(postgresUri, {
+  // Clean the URI - remove unsupported params like channel_binding
+  let cleanUri = postgresUri;
+  if (cleanUri) {
+    // Remove channel_binding parameter which pg driver doesn't support
+    cleanUri = cleanUri.replace(/[?&]channel_binding=[^&]*/g, '');
+    // Use direct connection (non-pooled) for better compatibility with Sequelize
+    cleanUri = cleanUri.replace(/-pooler/, '');
+  }
+  sequelize = new Sequelize(cleanUri, {
     dialect: 'postgres',
     dialectOptions: {
       ssl: {
@@ -32,6 +40,12 @@ if (dialect === 'sqlite') {
     logging: false,
     define: {
       timestamps: true,
+    },
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
     },
   });
 } else {
