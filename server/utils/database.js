@@ -57,8 +57,8 @@ async function connectDatabase() {
     require('../models/ContactMessage');
     require('../models/Counter');
 
-    // Sync models (creates tables if missing)
-    await sequelize.sync();
+    // Sync models (creates tables if missing, adds new columns if they don't exist)
+    await sequelize.sync({ alter: true });
 
     return {
       mode: dialect,
