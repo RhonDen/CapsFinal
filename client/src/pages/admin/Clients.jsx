@@ -1,106 +1,67 @@
 import api from '../../api.js';
-import { ChevronDown, ChevronUp, Loader2, Phone, Search, Users, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Phone, Search, Users, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
 
 const ITEMS_PER_PAGE = 10;
 
 function formatDateTime(value) {
-  if (!value) return 'N/A';
+  if (!value) return '—';
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return 'N/A';
+  if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleString('en-US', {
-    year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   });
 }
 
-function formatDateKey(dateKey) {
-  if (!dateKey) return 'N/A';
-  const [y, m, d] = dateKey.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString('en-US', {
-    weekday: 'short', year: 'numeric', month: 'long', day: 'numeric',
-  });
+function getClientName(client) {
+  if (client.fullName && client.fullName.trim()) return client.fullName.trim();
+  const parts = [client.firstName, client.lastName].filter(Boolean);
+  return parts.length ? parts.join(' ') : 'Unknown';
 }
-
-function formatTimeLabel(time) {
-  if (!time) return 'N/A';
-  const [hStr, mStr] = time.split(':');
-  const h = Number(hStr);
-  const m = Number(mStr);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return time;
-  const suffix = h >= 12 ? 'PM' : 'AM';
-  const displayHours = h % 12 || 12;
-  return `${displayHours}:${String(m).padStart(2, '0')} ${suffix}`;
-}
-
-const STATUS_OVERRIDES = {
-  pending: 'Pending', accepted: 'Approved', rejected: 'Rejected',
-  completed: 'Completed', notCompleted: 'Not Completed',
-};
-
-const STATUS_TONES = {
-  pending: 'bg-amber-100 text-amber-800', accepted: 'bg-sky-100 text-sky-800',
-  rejected: 'bg-red-100 text-red-700', completed: 'bg-emerald-100 text-emerald-700',
-  notCompleted: 'bg-rose-100 text-rose-700',
-};
 
 function Clients() {
   const [clients, setClients] = useState([]);
-  const [expandedNumber, setExpandedNumber] = useState(null);
-  const [appointmentsMap, setAppointmentsMap] = useState({});
-  const [loadingAppointments, setLoadingAppointments] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [phoneFilter, setPhoneFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchClients = async () => {
+      setLoading(true);
+      setError('');
       try {
         const response = await api.get('/api/admin/clients');
-        setClients(response.data);
+        setClients(response.data || []);
       } catch (requestError) {
         setError(requestError.response?.data?.error || 'Failed to load clients.');
+      } finally {
+        setLoading(false);
       }
     };
     fetchClients();
   }, []);
 
-  const fetchAppointmentsForNumber = async (number) => {
-    if (appointmentsMap[number]) return;
-    setLoadingAppointments((prev) => ({ ...prev, [number]: true }));
-    try {
-      const response = await api.get(`/api/admin/clients/${encodeURIComponent(number)}/appointments`);
-      setAppointmentsMap((prev) => ({ ...prev, [number]: response.data.appointments }));
-    } catch {
-      setAppointmentsMap((prev) => ({ ...prev, [number]: [] }));
-    } finally {
-      setLoadingAppointments((prev) => ({ ...prev, [number]: false }));
-    }
-  };
-
-  const toggleExpand = (number) => {
-    if (expandedNumber === number) {
-      setExpandedNumber(null);
-    } else {
-      setExpandedNumber(number);
-      fetchAppointmentsForNumber(number);
-    }
-  };
-
-  // Use the API response directly — no phone-number merging needed.
+  // Flat list — no phone-number grouping. Searchable by name or phone digits.
   const filteredClients = useMemo(() => {
     let result = clients;
-    const nameQuery = searchQuery.toLowerCase().trim();
+    const nameQuery = searchQuery.trim().toLowerCase();
     const phoneQuery = phoneFilter.replace(/\D/g, '').trim();
 
     if (nameQuery) {
       result = result.filter((client) => {
-        const fullName = (client.fullName || '').toLowerCase();
+        const name = getClientName(client).toLowerCase();
         const allNames = Array.isArray(client.allNames) ? client.allNames : [];
-        return fullName.includes(nameQuery) ||
-          allNames.some((name) => String(name || '').toLowerCase().includes(nameQuery));
+        return (
+          name.includes(nameQuery) ||
+          allNames.some((n) => String(n || '').toLowerCase().includes(nameQuery))
+        );
       });
     }
     if (phoneQuery) {
@@ -112,194 +73,158 @@ function Clients() {
     return result;
   }, [clients, searchQuery, phoneFilter]);
 
-  const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
   const paginatedClients = filteredClients.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
 
-  useEffect(() => { setCurrentPage(1); }, [searchQuery, phoneFilter]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, phoneFilter]);
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setPhoneFilter('');
+  };
+
+  const hasActiveFilters = searchQuery !== '' || phoneFilter !== '';
 
   return (
     <AdminPageShell
       title="Clients"
-      description="Search by patient name or phone number, click to view all appointments."
+      description="Search patients by name or phone number."
       icon={Users}
+      backTo="/admin/dashboard"
+      backLabel="Dashboard"
       maxWidth="max-w-5xl"
     >
-      {error ? (
-        <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>
-      ) : null}
+      {/* ── Search & Filter Bar ── */}
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-slate-400" />
+            <h2 className="text-sm font-semibold text-slate-700">Search Clients</h2>
+          </div>
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-red-500 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear all
+            </button>
+          )}
+        </div>
 
-      {/* Search & Filter Bar */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-silver-lake" />
-          <input
-            type="text"
-            placeholder="Search by patient name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-12 pr-10 text-sm text-police focus:border-silver-lake focus:outline-none focus:ring-4 focus:ring-silver-lake/15"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-silver-lake hover:text-police">
-              <X className="h-4 w-4" />
-            </button>
-          )}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by patient name…"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-300 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100"
+            />
+          </div>
+          <div className="relative">
+            <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
+            <input
+              type="text"
+              value={phoneFilter}
+              onChange={(e) => setPhoneFilter(e.target.value.replace(/\D/g, ''))}
+              placeholder="Filter by phone number…"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-300 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100"
+            />
+          </div>
         </div>
-        <div className="relative sm:w-64">
-          <Phone className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-silver-lake" />
-          <input
-            type="text"
-            placeholder="Filter by phone number..."
-            value={phoneFilter}
-            onChange={(e) => setPhoneFilter(e.target.value.replace(/\D/g, ''))}
-            className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-12 pr-10 text-sm text-police focus:border-silver-lake focus:outline-none focus:ring-4 focus:ring-silver-lake/15"
-          />
-          {phoneFilter && (
-            <button onClick={() => setPhoneFilter('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-silver-lake hover:text-police">
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+
+        {error && (
+          <div className="mt-3 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600">{error}</div>
+        )}
       </div>
 
-      {/* Results count */}
-      <p className="mb-4 text-sm text-silver-lake">
-        {filteredClients.length} client{filteredClients.length !== 1 ? 's' : ''}
-        {filteredClients.length !== clients.length && ` (filtered from ${clients.length})`}
+      {/* ── Results Count ── */}
+      <p className="mb-4 text-sm text-slate-500">
+        {loading
+          ? 'Loading clients…'
+          : `${filteredClients.length} client${filteredClients.length !== 1 ? 's' : ''}` +
+            (filteredClients.length !== clients.length ? ` (filtered from ${clients.length})` : '')}
       </p>
 
-      {/* Clients List */}
-      <div className="space-y-3">
-        {paginatedClients.map((client) => {
-          const isExpanded = expandedNumber === client.number;
-          return (
-            <div key={client.number} className="overflow-hidden rounded-[28px] border border-gray-100 bg-white shadow-sm transition">
-              <button
-                onClick={() => toggleExpand(client.number)}
-                className="flex w-full items-center justify-between p-5 text-left transition hover:bg-slate-50"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-lg font-semibold text-maastricht">{client.fullName}</p>
-                  <p className="mt-1 text-sm text-police">
-                    {client.number}
-                    {Array.isArray(client.allNames) && client.allNames.length > 1 ? (
-                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
-                        {client.allNames.length} names
-                      </span>
-                    ) : null}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="hidden text-xs text-silver-lake sm:block">
-                    Last: {formatDateTime(client.lastAppointment)}
-                  </span>
-                  {isExpanded ? (
-                    <ChevronUp className="h-5 w-5 text-silver-lake" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-silver-lake" />
-                  )}
-                </div>
-              </button>
-
-              {isExpanded && (
-                <div className="border-t border-gray-100 bg-slate-50/70 p-5">
-                  {Array.isArray(client.allNames) && client.allNames.length > 1 && (
-                    <div className="mb-4 rounded-2xl bg-purple-50 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-purple-600">Different names sharing this number</p>
-                      <p className="mt-1 text-sm text-purple-800">{client.allNames.join(', ')}</p>
-                    </div>
-                  )}
-
-                  {loadingAppointments[client.number] ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-silver-lake" />
-                      <span className="ml-2 text-sm text-police">Loading appointments...</span>
-                    </div>
-                  ) : appointmentsMap[client.number] && appointmentsMap[client.number].length > 0 ? (
-                    <div className="space-y-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-silver-lake">
-                        {appointmentsMap[client.number].length} appointment{appointmentsMap[client.number].length > 1 ? 's' : ''}
-                      </p>
-                      {appointmentsMap[client.number].map((appt) => (
-                        <div key={appt.id} className="rounded-2xl border border-gray-200 bg-white p-4">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <p className="font-semibold text-maastricht">{appt.fullName}</p>
-                              <p className="mt-0.5 text-sm text-silver-lake">
-                                {appt.service}{appt.isWalkIn ? ' (Walk-in)' : ''}
-                              </p>
-                            </div>
-                            <span className={`inline-flex w-max items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ${STATUS_TONES[appt.status] || 'bg-gray-100 text-gray-700'}`}>
-                              {STATUS_OVERRIDES[appt.status] || appt.status}
-                            </span>
-                          </div>
-                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                            <div className="rounded-xl bg-slate-50 p-2.5">
-                              <p className="text-xs text-silver-lake">Date</p>
-                              <p className="text-sm font-medium text-police">{formatDateKey(appt.dateKey)}</p>
-                            </div>
-                            <div className="rounded-xl bg-slate-50 p-2.5">
-                              <p className="text-xs text-silver-lake">Time</p>
-                              <p className="text-sm font-medium text-police">{formatTimeLabel(appt.time)}</p>
-                            </div>
-                          </div>
-                          {appt.serialNumber && (
-                            <p className="mt-2 text-xs text-silver-lake">Booking #{appt.serialNumber}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : appointmentsMap[client.number] ? (
-                    <p className="py-4 text-center text-sm text-police">No appointments found for this number.</p>
-                  ) : null}
-                </div>
-              )}
+      {/* ── Results: Flat Clients Table ── */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="flex items-center gap-3 text-slate-400">
+              <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+              <span className="text-sm">Loading clients…</span>
             </div>
-          );
-        })}
-
-        {filteredClients.length === 0 && !error ? (
-          <p className="rounded-2xl bg-slate-50 p-6 text-center text-sm text-police">
-            {searchQuery.trim() || phoneFilter.trim()
-              ? 'No clients match your search.'
-              : 'No client records yet.'}
-          </p>
-        ) : null}
+          </div>
+        ) : paginatedClients.length === 0 ? (
+          <div className="py-16 text-center">
+            <Users className="mx-auto h-10 w-10 text-slate-200" />
+            <p className="mt-3 text-sm text-slate-400">
+              {hasActiveFilters ? 'No clients match your search.' : 'No client records yet.'}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/50">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Name</th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Phone</th>
+                  <th className="hidden px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:table-cell sm:px-6">Last Appointment</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedClients.map((client) => (
+                  <tr key={client.number || client.id} className="transition hover:bg-slate-50">
+                    <td className="px-5 py-3.5 text-sm font-medium text-slate-900 sm:px-6">
+                      {getClientName(client)}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-sm text-slate-600 sm:px-6">
+                      {client.number || '—'}
+                    </td>
+                    <td className="hidden whitespace-nowrap px-5 py-3.5 text-sm text-slate-600 sm:table-cell sm:px-6">
+                      {formatDateTime(client.lastAppointment)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-center gap-2">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-police transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Previous
-          </button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+      {/* ── Pagination ── */}
+      {!loading && totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-xs text-slate-400">
+            Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+            {Math.min(currentPage * ITEMS_PER_PAGE, filteredClients.length)} of {filteredClients.length} clients
+          </p>
+          <div className="flex items-center gap-2">
             <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                page === currentPage
-                  ? 'bg-silver-lake text-white'
-                  : 'border border-gray-200 bg-white text-police hover:bg-slate-50'
-              }`}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {page}
+              <ChevronLeft className="h-4 w-4" /> Prev
             </button>
-          ))}
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-police transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Next
-          </button>
+            <span className="text-sm text-slate-500">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
     </AdminPageShell>
