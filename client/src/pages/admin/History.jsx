@@ -85,10 +85,12 @@ function History() {
     try {
       const params = new URLSearchParams();
 
-      // If search text is provided, send it to backend which ignores date filters
-      if (searchQuery.trim()) {
-        params.set('search', searchQuery.trim());
-      } else {
+      // When search text is present, fetch ALL records and filter client-side.
+      // This keeps search working even if the deployed backend hasn't caught up
+      // with the newer search-mode logic.
+      const isSearchMode = Boolean(searchQuery.trim());
+
+      if (!isSearchMode) {
         // Normal filter mode: use date range and other filters
         if (fromDate) params.set('from', fromDate);
         if (toDate) params.set('to', toDate);
@@ -110,13 +112,37 @@ function History() {
   }, [fetchHistory]);
 
   // Flat list — no phone grouping. Sort by date descending.
+  // When a search query is present, filter client-side by name or phone digits.
   const sortedAppointments = useMemo(() => {
-    return [...appointments].sort((a, b) => {
+    const q = searchQuery.trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, '');
+
+    let rows = appointments;
+    if (q) {
+      rows = rows.filter((a) => {
+        const nameStr = [a.firstName, a.lastName, a.middleInitial]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        const fullNameStr = String(a.fullName || '').toLowerCase();
+        const numberStr = String(a.number || '').toLowerCase();
+        if (qDigits) {
+          return (
+            numberStr.replace(/\D/g, '').includes(qDigits) ||
+            fullNameStr.includes(q) ||
+            nameStr.includes(q)
+          );
+        }
+        return fullNameStr.includes(q) || nameStr.includes(q) || numberStr.includes(q);
+      });
+    }
+
+    return rows.sort((a, b) => {
       const aDate = a.scheduledStart || a.date || a.createdAt;
       const bDate = b.scheduledStart || b.date || b.createdAt;
       return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
-  }, [appointments]);
+  }, [appointments, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(sortedAppointments.length / ITEMS_PER_PAGE));
   const paginatedAppointments = sortedAppointments.slice(
