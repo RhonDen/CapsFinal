@@ -89,45 +89,28 @@ function Clients() {
     }
   };
 
-  const groupedClients = useMemo(() => {
-    const numberGroups = new Map();
-    clients.forEach((client) => {
-      if (!numberGroups.has(client.number)) {
-        numberGroups.set(client.number, {
-          allNames: new Set(), lastAppointment: client.lastAppointment, fullName: client.fullName,
-        });
-      }
-      const group = numberGroups.get(client.number);
-      if (Array.isArray(client.allNames) && client.allNames.length > 0) {
-        client.allNames.forEach((name) => { if (name) group.allNames.add(name); });
-      } else if (client.fullName) {
-        group.allNames.add(client.fullName);
-      }
-    });
-    return Array.from(numberGroups.entries()).map(([number, group]) => ({
-      number, fullName: group.fullName,
-      allNames: Array.from(group.allNames).sort(), lastAppointment: group.lastAppointment,
-    }));
-  }, [clients]);
-
+  // Use the API response directly — no phone-number merging needed.
   const filteredClients = useMemo(() => {
-    let result = groupedClients;
+    let result = clients;
     const nameQuery = searchQuery.toLowerCase().trim();
     const phoneQuery = phoneFilter.replace(/\D/g, '').trim();
 
     if (nameQuery) {
-      result = result.filter((client) =>
-        client.allNames.some((name) => name.toLowerCase().includes(nameQuery))
-      );
+      result = result.filter((client) => {
+        const fullName = (client.fullName || '').toLowerCase();
+        const allNames = Array.isArray(client.allNames) ? client.allNames : [];
+        return fullName.includes(nameQuery) ||
+          allNames.some((name) => String(name || '').toLowerCase().includes(nameQuery));
+      });
     }
     if (phoneQuery) {
       result = result.filter((client) => {
-        const digits = client.number.replace(/\D/g, '');
+        const digits = String(client.number || '').replace(/\D/g, '');
         return digits.includes(phoneQuery);
       });
     }
     return result;
-  }, [groupedClients, searchQuery, phoneFilter]);
+  }, [clients, searchQuery, phoneFilter]);
 
   const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
   const paginatedClients = filteredClients.slice(
@@ -185,7 +168,7 @@ function Clients() {
       {/* Results count */}
       <p className="mb-4 text-sm text-silver-lake">
         {filteredClients.length} client{filteredClients.length !== 1 ? 's' : ''}
-        {filteredClients.length !== groupedClients.length && ` (filtered from ${groupedClients.length})`}
+        {filteredClients.length !== clients.length && ` (filtered from ${clients.length})`}
       </p>
 
       {/* Clients List */}
@@ -202,7 +185,7 @@ function Clients() {
                   <p className="truncate text-lg font-semibold text-maastricht">{client.fullName}</p>
                   <p className="mt-1 text-sm text-police">
                     {client.number}
-                    {client.allNames.length > 1 ? (
+                    {Array.isArray(client.allNames) && client.allNames.length > 1 ? (
                       <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
                         {client.allNames.length} names
                       </span>
@@ -223,7 +206,7 @@ function Clients() {
 
               {isExpanded && (
                 <div className="border-t border-gray-100 bg-slate-50/70 p-5">
-                  {client.allNames.length > 1 && (
+                  {Array.isArray(client.allNames) && client.allNames.length > 1 && (
                     <div className="mb-4 rounded-2xl bg-purple-50 p-3">
                       <p className="text-xs font-semibold uppercase tracking-wider text-purple-600">Different names sharing this number</p>
                       <p className="mt-1 text-sm text-purple-800">{client.allNames.join(', ')}</p>

@@ -1,5 +1,5 @@
 import api from '../../api.js';
-import { Calendar, ChevronDown, ChevronUp, Filter, Search, X } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Filter, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AdminPageShell from '../../components/admin/AdminPageShell.jsx';
 
@@ -31,13 +31,6 @@ const STATUS_LABEL = {
   cancelled: 'Cancelled',
 };
 
-function formatDateOnly(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 10);
-}
-
 function formatDateKey(dateKey) {
   if (!dateKey) return '—';
   const [y, m, d] = String(dateKey).split('-').map(Number);
@@ -57,15 +50,6 @@ function formatTime(time) {
   const suffix = h >= 12 ? 'PM' : 'AM';
   const display = h % 12 || 12;
   return `${display}:${String(m).padStart(2, '0')} ${suffix}`;
-}
-
-function normalizePhone(value) {
-  const digits = String(value || '').replace(/\D/g, '');
-  if (!digits) return '';
-  let key = digits;
-  if (key.startsWith('63')) key = key.slice(2);
-  if (key.startsWith('0')) key = key.slice(1);
-  return key.length > 10 ? key.slice(-10) : key;
 }
 
 function getPatientName(row) {
@@ -92,7 +76,6 @@ function History() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [appointments, setAppointments] = useState([]);
-  const [expandedPhone, setExpandedPhone] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   const fetchHistory = useCallback(async () => {
@@ -101,7 +84,7 @@ function History() {
 
     try {
       const params = new URLSearchParams();
-      
+
       // If search text is provided, send it to backend which ignores date filters
       if (searchQuery.trim()) {
         params.set('search', searchQuery.trim());
@@ -126,43 +109,24 @@ function History() {
     fetchHistory();
   }, [fetchHistory]);
 
-  // No client-side filtering needed — backend handles search across ALL records
-  const groupedByPhone = useMemo(() => {
-    const groups = new Map();
-
-    appointments.forEach((a) => {
-      const key = normalizePhone(a.number) || `unknown-${a.id}`;
-      if (!groups.has(key)) {
-        groups.set(key, { phoneKey: key, displayNumber: a.number || 'N/A', appointments: [] });
-      }
-      groups.get(key).appointments.push(a);
+  // Flat list — no phone grouping. Sort by date descending.
+  const sortedAppointments = useMemo(() => {
+    return [...appointments].sort((a, b) => {
+      const aDate = a.scheduledStart || a.date || a.createdAt;
+      const bDate = b.scheduledStart || b.date || b.createdAt;
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
-
-    return Array.from(groups.values())
-      .map((g) => {
-        const sorted = g.appointments.sort((a, b) => {
-          const aDate = a.scheduledStart || a.date || a.createdAt;
-          const bDate = b.scheduledStart || b.date || b.createdAt;
-          return new Date(bDate).getTime() - new Date(aDate).getTime();
-        });
-        const latest = sorted[0];
-        return {
-          ...g,
-          appointments: sorted,
-          latestName: getPatientName(latest),
-          latestDate: latest?.dateKey || latest?.date || latest?.scheduledStart,
-          count: sorted.length,
-        };
-      })
-      .sort((a, b) => {
-        const aTime = new Date(a.latestDate).getTime();
-        const bTime = new Date(b.latestDate).getTime();
-        if (!Number.isFinite(aTime) && !Number.isFinite(bTime)) return 0;
-        if (!Number.isFinite(aTime)) return 1;
-        if (!Number.isFinite(bTime)) return -1;
-        return bTime - aTime;
-      });
   }, [appointments]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedAppointments.length / ITEMS_PER_PAGE));
+  const paginatedAppointments = sortedAppointments.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, fromDate, toDate, statusFilter, phoneFilter]);
 
   const clearFilters = () => {
     setFromDate(() => {
@@ -290,8 +254,8 @@ function History() {
         )}
       </div>
 
-      {/* ── Results ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {/* ── Results: Flat Appointment Table ── */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="flex items-center gap-3 text-slate-400">
@@ -299,99 +263,81 @@ function History() {
               <span className="text-sm">Loading history…</span>
             </div>
           </div>
-        ) : groupedByPhone.length === 0 ? (
+        ) : sortedAppointments.length === 0 ? (
           <div className="py-16 text-center">
             <Calendar className="mx-auto h-10 w-10 text-slate-200" />
             <p className="mt-3 text-sm text-slate-400">No appointments found for the selected filters.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {groupedByPhone.map((group) => {
-              const isExpanded = expandedPhone === group.phoneKey;
-
-              return (
-                <div key={group.phoneKey}>
-                  {/* ── Group Header ── */}
-                  <button
-                    onClick={() => setExpandedPhone(isExpanded ? null : group.phoneKey)}
-                    className="flex w-full items-center justify-between px-5 py-4 text-left transition hover:bg-slate-50 sm:px-6"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-slate-900 truncate">
-                          {group.latestName}
-                        </h3>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${group.count > 1 ? 'bg-purple-50 text-purple-700 ring-1 ring-purple-200' : 'bg-slate-50 text-slate-500 ring-1 ring-slate-200'}`}>
-                          {group.count}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        {group.displayNumber} &middot; Latest: {formatDateKey(group.latestDate)}
-                      </p>
-                    </div>
-                    <div className="ml-4 flex-shrink-0 text-slate-300">
-                      {isExpanded ? (
-                        <ChevronUp className="h-5 w-5" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5" />
-                      )}
-                    </div>
-                  </button>
-
-                  {/* ── Expanded Appointments ── */}
-                  {isExpanded && (
-                    <div className="border-t border-slate-100 bg-slate-50/50">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                          <thead>
-                            <tr className="border-b border-slate-100">
-                              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Date</th>
-                              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Time</th>
-                              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Patient</th>
-                              <th className="hidden px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:table-cell sm:px-6">Service</th>
-                              <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {group.appointments.map((a) => (
-                              <tr key={a.id} className="transition hover:bg-white">
-                                <td className="whitespace-nowrap px-5 py-3 text-sm text-slate-700 sm:px-6">
-                                  {formatDateKey(a.dateKey || a.date)}
-                                </td>
-                                <td className="whitespace-nowrap px-5 py-3 text-sm text-slate-700 sm:px-6">
-                                  {formatTime(a.time)}
-                                </td>
-                                <td className="px-5 py-3 text-sm font-medium text-slate-900 sm:px-6">
-                                  <div>{getPatientName(a)}</div>
-                                  <div className="text-xs text-slate-400">{a.number}</div>
-                                </td>
-                                <td className="hidden whitespace-nowrap px-5 py-3 text-sm text-slate-600 sm:table-cell sm:px-6">
-                                  {a.service || '—'}
-                                </td>
-                                <td className="whitespace-nowrap px-5 py-3 sm:px-6">
-                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[a.status] || 'bg-slate-50 text-slate-600 ring-1 ring-slate-200'}`}>
-                                    {STATUS_LABEL[a.status] || a.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/50">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Date</th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Time</th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Patient</th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Phone</th>
+                  <th className="hidden px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:table-cell sm:px-6">Service</th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 sm:px-6">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedAppointments.map((a) => (
+                  <tr key={a.id} className="transition hover:bg-slate-50">
+                    <td className="whitespace-nowrap px-5 py-3.5 text-sm text-slate-700 sm:px-6">
+                      {formatDateKey(a.dateKey || a.date)}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-sm text-slate-700 sm:px-6">
+                      {formatTime(a.time)}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm font-medium text-slate-900 sm:px-6">
+                      {getPatientName(a)}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-sm text-slate-600 sm:px-6">
+                      {a.number || '—'}
+                    </td>
+                    <td className="hidden whitespace-nowrap px-5 py-3.5 text-sm text-slate-600 sm:table-cell sm:px-6">
+                      {a.service || '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 sm:px-6">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[a.status] || 'bg-slate-50 text-slate-600 ring-1 ring-slate-200'}`}>
+                        {STATUS_LABEL[a.status] || a.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
-      {/* ── Summary ── */}
-      {!loading && groupedByPhone.length > 0 && (
-        <div className="mt-4 text-center text-xs text-slate-400">
-          Showing {groupedByPhone.length} patient group{groupedByPhone.length !== 1 ? 's' : ''} &middot;{' '}
-          {appointments.length} total appointment{appointments.length !== 1 ? 's' : ''}
+      {/* ── Pagination ── */}
+      {!loading && totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-xs text-slate-400">
+            Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+            {Math.min(currentPage * ITEMS_PER_PAGE, sortedAppointments.length)} of {sortedAppointments.length} appointments
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ChevronLeft className="h-4 w-4" /> Prev
+            </button>
+            <span className="text-sm text-slate-500">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
     </AdminPageShell>
