@@ -44,6 +44,7 @@ const QUICK_LINKS = [
     label: 'Inbox',
     icon: Mail,
     tone: 'bg-emerald-600 text-white hover:bg-emerald-700',
+    badgeKey: 'unreadCount',
   },
   {
     to: '/admin/walk-in',
@@ -87,6 +88,22 @@ function AdminDashboard() {
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectModal, setRejectModal] = useState({ open: false, appointmentId: null });
   const [rejectionReason, setRejectionReason] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await api.get('/api/contact/messages/unread-count');
+        setUnreadCount(response.data.count || 0);
+      } catch {
+        // Silently fail
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let intervalId = null;
@@ -283,17 +300,24 @@ function AdminDashboard() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
                 {QUICK_LINKS.map((item) => {
                   const Icon = item.icon;
+                  const badgeValue = item.badgeKey === 'unreadCount' ? unreadCount : 0;
+                  const hasBadge = badgeValue > 0;
                   return (
                     <Link
                       key={item.to}
                       to={item.to}
-                      className={`flex items-center justify-between rounded-[22px] p-6 transition ${item.tone}`}
+                      className={`relative flex items-center justify-between rounded-[22px] p-6 transition ${item.tone}`}
                     >
                       <div>
                         <p className="text-sm opacity-80">Open</p>
                         <p className="text-lg font-semibold">{item.label}</p>
                       </div>
                       <Icon className="h-6 w-6" />
+                      {hasBadge && (
+                        <span className="absolute right-3 top-3 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white shadow-lg ring-2 ring-white/30">
+                          {badgeValue > 9 ? '9+' : badgeValue}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}

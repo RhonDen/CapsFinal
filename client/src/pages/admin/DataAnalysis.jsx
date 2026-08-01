@@ -413,8 +413,8 @@ function DataAnalysis() {
                   cx="50%"
                   cy="50%"
                   outerRadius={88}
-                  // Prevent chart/text overlap; we’ll rely on tooltip instead.
-                  label={false}
+                  label={renderPieLabel}
+                  labelLine={true}
                 >
                   {(analysisType === 'predictive' ? data.predictivePie : data.pie).map(
                     (entry, index) => {
