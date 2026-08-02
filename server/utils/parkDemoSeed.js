@@ -67,18 +67,13 @@ function dateKeyFromLocalDate(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-function lastAprilMayWindow(today) {
-  const year = today.getFullYear();
-  let aprilStart = new Date(year, 3, 1); // April 1
-  let mayEnd = new Date(year, 4, 31, 23, 59, 59); // May 31
-
-  // If today is before June, use last year's April-May window.
-  if (today < aprilStart) {
-    aprilStart = new Date(year - 1, 3, 1);
-    mayEnd = new Date(year - 1, 4, 31, 23, 59, 59);
-  }
-
-  return { start: aprilStart, end: mayEnd };
+function lastDaysWindow(days, today) {
+  const end = new Date(today);
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(end);
+  start.setDate(start.getDate() - days);
+  start.setHours(0, 0, 0, 0);
+  return { start, end };
 }
 
 // ── Filipino data pools ─────────────────────────────────────────────────────
@@ -154,10 +149,10 @@ async function seedParkDemo({ total = 70, manageConnection = true } = {}) {
     await Appointment.destroy({ where: { notes: { [Op.like]: '[FAKE]%' } } });
 
     const today = new Date();
-    const { start: aprStart, end: mayEnd } = lastAprilMayWindow(today);
-    const aprLabel = dateKeyFromLocalDate(aprStart);
-    const mayLabel = dateKeyFromLocalDate(mayEnd);
-    logger.log(`Park demo: seeding ${parkTotal} appointments from ${aprLabel} to ${mayLabel}`);
+    const { start: windowStart, end: windowEnd } = lastDaysWindow(60, today);
+    const fromLabel = dateKeyFromLocalDate(windowStart);
+    const toLabel = dateKeyFromLocalDate(windowEnd);
+    logger.log(`Park demo: seeding ${parkTotal} appointments from ${fromLabel} to ${toLabel}`);
 
     // Weighted statuses (heavy on completed / notCompleted / rejected)
     const parkStatuses = [
@@ -189,12 +184,12 @@ async function seedParkDemo({ total = 70, manageConnection = true } = {}) {
     const appointments = [];
 
     for (let i = 0; i < parkTotal; i++) {
-      const dayOffset = randInt(0, Math.floor((mayEnd - aprStart) / 86400000));
-      const d = new Date(aprStart.getTime() + dayOffset * 86400000);
+      const dayOffset = randInt(0, Math.floor((windowEnd - windowStart) / 86400000));
+      const d = new Date(windowStart.getTime() + dayOffset * 86400000);
       // Keep outside clinic's closed days: avoid Sundays for variety
       if (d.getDay() === 0) {
         d.setDate(d.getDate() + 1);
-        if (d > mayEnd) d.setDate(d.getDate() - 2);
+        if (d > windowEnd) d.setDate(d.getDate() - 2);
       }
 
       const dateKey = dateKeyFromLocalDate(d);
@@ -213,8 +208,8 @@ async function seedParkDemo({ total = 70, manageConnection = true } = {}) {
       const middleInitial = pick(FILIPINO_MIDDLE);
       const mobile = generatePhMobile();
 
-      // 60% of the time reuse a previous mobile to simulate returning patients.
-      const reuseMobile = appointments.length > 0 && Math.random() < 0.6
+      // 25% of the time reuse a previous mobile to simulate returning patients.
+      const reuseMobile = appointments.length > 0 && Math.random() < 0.25
         ? pick(appointments).number
         : mobile;
 
@@ -268,8 +263,8 @@ async function seedParkDemo({ total = 70, manageConnection = true } = {}) {
     return {
       total: appointments.length,
       walkIns: walkInCount,
-      from: aprLabel,
-      to: mayLabel,
+      from: fromLabel,
+      to: toLabel,
       serialStart: serialBase + 1,
       serialEnd: serialBase + appointments.length,
     };
@@ -288,5 +283,5 @@ module.exports = {
   buildScheduled,
   getServiceDurationMinutes,
   dateKeyFromLocalDate,
-  lastAprilMayWindow,
+  lastDaysWindow,
 };
