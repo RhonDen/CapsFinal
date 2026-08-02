@@ -25,6 +25,31 @@ import {
 
 const COLORS = ['#0C243D', '#27496A', '#5C8EB4', '#9AB7CD', '#C1D1DB', '#E8A87C', '#95D5B2', '#F4A261'];
 
+// Distinct colors for each appointment status in the Status Distribution chart.
+const STATUS_BAR_COLORS = {
+  accepted: '#3B82F6',
+  rejected: '#EF4444',
+  completed: '#10B981',
+  notCompleted: '#F59E0B',
+  cancelled: '#6B7280',
+  pending: '#8B5CF6',
+};
+
+// Track the viewport width so charts can adapt to phones vs desktops.
+function useViewportWidth() {
+  const [width, setWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1024
+  );
+
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return width;
+}
+
 const ANALYSIS_TYPES = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
@@ -66,20 +91,23 @@ const PieTooltip = ({ active, payload }) => {
 
 // Custom label for pie chart showing percentage.
 // Truncate long service names so labels stay inside the chart bounds.
-const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
-  const RADIAN = Math.PI / 180;
-  const radius = outerRadius + 24;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  const pct = (percent * 100).toFixed(1);
-  const rawName = String(name || '');
-  const shortName = rawName.length > 20 ? `${rawName.slice(0, 18)}…` : rawName;
-  return (
-    <text x={x} y={y} fill="#374151" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs font-medium dark:fill-slate-300">
-      {`${shortName} (${pct}%)`}
-    </text>
-  );
-};
+const renderPieLabel = (labelRadiusOffset = 24, maxLabelLen = 18) =>
+  ({ cx, cy, midAngle, outerRadius, percent, name }) => {
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + labelRadiusOffset;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const pct = (percent * 100).toFixed(1);
+    const rawName = String(name || '');
+    const shortName = rawName.length > maxLabelLen
+      ? `${rawName.slice(0, maxLabelLen - 1)}…`
+      : rawName;
+    return (
+      <text x={x} y={y} fill="#374151" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[11px] font-medium dark:fill-slate-300 sm:text-xs">
+        {`${shortName} (${pct}%)`}
+      </text>
+    );
+  };
 
 function DataAnalysis() {
   const now = new Date();
@@ -107,6 +135,16 @@ function DataAnalysis() {
 
   const [selectedPredictiveService, setSelectedPredictiveService] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const viewportWidth = useViewportWidth();
+  const isMobile = viewportWidth < 640;
+  const pieOuterRadius = isMobile ? 52 : 78;
+  const pieLabelOffset = isMobile ? 14 : 24;
+  const pieMaxLabelLen = isMobile ? 10 : 18;
+  const pieMargins = isMobile
+    ? { top: 16, right: 16, bottom: 16, left: 16 }
+    : { top: 40, right: 60, bottom: 40, left: 60 };
+  const pieHeightClass = isMobile ? 'h-[320px]' : 'h-[380px]';
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -406,17 +444,17 @@ function DataAnalysis() {
               : 'Most Completed Services'}
           </h2>
 
-          <div className="h-[380px]">
+          <div className={pieHeightClass}>
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart margin={{ top: 40, right: 60, bottom: 40, left: 60 }}>
+              <PieChart margin={pieMargins}>
                 <Pie
                   data={analysisType === 'predictive' ? data.predictivePie : data.pie}
                   dataKey="value"
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  outerRadius={78}
-                  label={renderPieLabel}
+                  outerRadius={pieOuterRadius}
+                  label={renderPieLabel(pieLabelOffset, pieMaxLabelLen)}
                   labelLine={true}
                 >
                   {(analysisType === 'predictive' ? data.predictivePie : data.pie).map(
@@ -577,7 +615,14 @@ function DataAnalysis() {
                 <XAxis dataKey="statusLabel" />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="count" fill="#5C8EB4" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                  {(data.bar || []).map((entry, index) => (
+                    <Cell
+                      key={`status-cell-${index}`}
+                      fill={STATUS_BAR_COLORS[entry.name] || '#5C8EB4'}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
