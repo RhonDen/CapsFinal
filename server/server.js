@@ -124,24 +124,19 @@ const startServer = async () => {
     app.use('/api/admin', adminRoute);
     app.use('/api/public', publicBlockedDatesRoute);
 
-    // ── Auto-seed demo data if the appointments table is empty ──────────────
+    // ── Auto-seed park demo data on every deploy ────────────────────────────
     // This ensures the deployed site always has visible demo data for
     // Data Analysis, History, Clients, and Dashboard.
+    // The seed function purges old [FAKE] rows before inserting new ones,
+    // so real appointments are never touched.
     try {
-      const Appointment = require('./models/Appointment');
-      const { Op } = require('sequelize');
-      const count = await Appointment.count();
-      if (count === 0) {
-        console.log('No appointments found — auto-seeding park demo data...');
-        const { seedParkDemo } = require('./utils/parkDemoSeed');
-        const result = await seedParkDemo({
-          total: 70,
-          manageConnection: false,
-        });
-        console.log(`Auto-seed complete: ${result.total} appointments (${result.walkIns} walk-ins) from ${result.from} to ${result.to}`);
-      } else {
-        console.log(`Found ${count} existing appointments — skipping auto-seed.`);
-      }
+      console.log('Auto-seeding park demo data...');
+      const { seedParkDemo } = require('./utils/parkDemoSeed');
+      const result = await seedParkDemo({
+        total: 70,
+        manageConnection: false,
+      });
+      console.log(`Auto-seed complete: ${result.total} appointments (${result.walkIns} walk-ins) from ${result.from} to ${result.to}`);
     } catch (seedError) {
       console.error('Auto-seed error (non-fatal):', seedError.message);
     }
