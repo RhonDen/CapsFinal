@@ -89,25 +89,43 @@ const PieTooltip = ({ active, payload }) => {
   return null;
 };
 
-// Custom label for pie chart showing percentage.
-// Truncate long service names so labels stay inside the chart bounds.
-const renderPieLabel = (labelRadiusOffset = 24, maxLabelLen = 18) =>
-  ({ cx, cy, midAngle, outerRadius, percent, name }) => {
-    const RADIAN = Math.PI / 180;
-    const radius = outerRadius + labelRadiusOffset;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    const pct = (percent * 100).toFixed(1);
-    const rawName = String(name || '');
-    const shortName = rawName.length > maxLabelLen
-      ? `${rawName.slice(0, maxLabelLen - 1)}…`
-      : rawName;
-    return (
-      <text x={x} y={y} fill="#374151" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[11px] font-medium dark:fill-slate-300 sm:text-xs">
-        {`${shortName} (${pct}%)`}
-      </text>
-    );
-  };
+// Clean legend list below the pie chart showing full service name,
+// count, and percentage — prevents text overlap entirely.
+const PieLegend = ({ data, colors }) => {
+  if (!data || data.length === 0) return null;
+  const total = data.reduce((sum, item) => sum + Number(item.value || 0), 0);
+
+  return (
+    <div className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+      {data.map((entry, idx) => {
+        const pct = total > 0 ? ((Number(entry.value || 0) / total) * 100).toFixed(1) : '0.0';
+        return (
+          <div
+            key={`${entry.name}-${idx}`}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+          >
+            <span
+              className="h-3 w-3 shrink-0 rounded-full"
+              style={{ backgroundColor: colors[idx % colors.length] }}
+            />
+            <span
+              className="min-w-0 flex-1 truncate text-xs font-medium text-maastricht dark:text-slate-200"
+              title={entry.name}
+            >
+              {entry.name}
+            </span>
+            <span className="shrink-0 text-xs font-bold text-maastricht dark:text-slate-100">
+              {entry.value}
+            </span>
+            <span className="w-12 shrink-0 text-right text-xs text-police dark:text-slate-400">
+              {pct}%
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 function DataAnalysis() {
   const now = new Date();
@@ -138,13 +156,12 @@ function DataAnalysis() {
 
   const viewportWidth = useViewportWidth();
   const isMobile = viewportWidth < 640;
-  const pieOuterRadius = isMobile ? 52 : 78;
-  const pieLabelOffset = isMobile ? 14 : 24;
-  const pieMaxLabelLen = isMobile ? 10 : 18;
+  const pieOuterRadius = isMobile ? 90 : 140;
+  const pieInnerRadius = isMobile ? 45 : 70;
   const pieMargins = isMobile
     ? { top: 16, right: 16, bottom: 16, left: 16 }
     : { top: 40, right: 60, bottom: 40, left: 60 };
-  const pieHeightClass = isMobile ? 'h-[320px]' : 'h-[380px]';
+  const pieHeightClass = isMobile ? 'h-[440px]' : 'h-[560px]';
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -453,9 +470,9 @@ function DataAnalysis() {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
+                  innerRadius={pieInnerRadius}
                   outerRadius={pieOuterRadius}
-                  label={renderPieLabel(pieLabelOffset, pieMaxLabelLen)}
-                  labelLine={true}
+                  paddingAngle={2}
                 >
                   {(analysisType === 'predictive' ? data.predictivePie : data.pie).map(
                     (entry, index) => {
@@ -493,10 +510,14 @@ function DataAnalysis() {
                     return [`${value}`, name];
                   }}
                 />
-                <Legend />
               </PieChart>
             </ResponsiveContainer>
           </div>
+
+          <PieLegend
+            data={analysisType === 'predictive' ? data.predictivePie : data.pie}
+            colors={COLORS}
+          />
 
           {analysisType === 'predictive' && predictiveServiceDetails ? (
             <div className="mt-4 rounded-xl bg-slate-50 p-4 dark:bg-slate-900/30">
