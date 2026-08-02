@@ -633,6 +633,8 @@ router.delete('/block-dates/:id', auth, asyncHandler(async (req, res) => {
   res.json({ message: 'Removed.' });
 }));
 
+// FLAT clients list: one row per appointment, no phone-number grouping.
+// This lets admins see every patient visit (even with the same number).
 router.get(
   '/clients',
   auth,
@@ -642,44 +644,24 @@ router.get(
       raw: true,
       order: [['scheduledStart', 'DESC'], ['id', 'DESC']]
     });
-    
-    const clientMap = new Map();
-    for (const a of allAppts) {
-      const phone = a.number || '';
-      const cleaned = phone.replace(/\D/g, '');
-      if (!cleaned || cleaned.length < 10) continue;
-      const key = cleaned.slice(-10);
-      const displayName = [a.firstName, a.lastName].filter(Boolean).join(' ') || 'Unknown';
-      
-      if (!clientMap.has(key)) {
-        clientMap.set(key, { 
-          number: a.number,
-          fullName: displayName,
-          allNames: new Set(),
-          lastAppointment: a.scheduledStart || a.date || a.createdAt,
-          appointmentCount: 0,
-        });
-      }
-      const entry = clientMap.get(key);
-      entry.appointmentCount++;
-      // Collect all unique names for this number
-      if (displayName && displayName !== 'Unknown') {
-        entry.allNames.add(displayName);
-      }
-      // Track latest appointment date
-      const apptDate = a.scheduledStart || a.date || a.createdAt;
-      if (apptDate && (!entry.lastAppointment || new Date(apptDate) > new Date(entry.lastAppointment))) {
-        entry.lastAppointment = apptDate;
-      }
-    }
 
-    const clients = Array.from(clientMap.values())
-      .map(c => ({
-        ...c,
-        allNames: Array.from(c.allNames).sort(),
-      }))
-      .sort((a, b) => b.appointmentCount - a.appointmentCount);
-    
+    const clients = allAppts.map((a) => {
+      const displayName = [a.firstName, a.lastName].filter(Boolean).join(' ') || 'Unknown';
+      const apptDate = a.scheduledStart || a.date || a.createdAt;
+      return {
+        id: a.id,
+        number: a.number || '',
+        fullName: displayName,
+        allNames: [displayName],
+        lastAppointment: apptDate,
+        appointmentCount: 1,
+        service: a.service || '',
+        status: a.status || '',
+        dateKey: a.dateKey || null,
+        createdAt: a.createdAt,
+      };
+    });
+
     res.json(clients);
   })
 );
