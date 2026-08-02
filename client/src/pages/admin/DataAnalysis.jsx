@@ -64,16 +64,19 @@ const PieTooltip = ({ active, payload }) => {
   return null;
 };
 
-// Custom label for pie chart showing percentage
+// Custom label for pie chart showing percentage.
+// Truncate long service names so labels stay inside the chart bounds.
 const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
   const RADIAN = Math.PI / 180;
-  const radius = outerRadius + 30;
+  const radius = outerRadius + 24;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
   const pct = (percent * 100).toFixed(1);
+  const rawName = String(name || '');
+  const shortName = rawName.length > 20 ? `${rawName.slice(0, 18)}…` : rawName;
   return (
-    <text x={x} y={y} fill="#374151" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs">
-      {`${name} (${pct}%)`}
+    <text x={x} y={y} fill="#374151" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs font-medium dark:fill-slate-300">
+      {`${shortName} (${pct}%)`}
     </text>
   );
 };
@@ -403,16 +406,16 @@ function DataAnalysis() {
               : 'Most Completed Services'}
           </h2>
 
-          <div className="h-[280px]">
+          <div className="h-[380px]">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              <PieChart margin={{ top: 40, right: 60, bottom: 40, left: 60 }}>
                 <Pie
                   data={analysisType === 'predictive' ? data.predictivePie : data.pie}
                   dataKey="value"
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  outerRadius={88}
+                  outerRadius={78}
                   label={renderPieLabel}
                   labelLine={true}
                 >
@@ -452,7 +455,7 @@ function DataAnalysis() {
                     return [`${value}`, name];
                   }}
                 />
-                {analysisType !== 'predictive' ? <Legend /> : null}
+                <Legend />
               </PieChart>
             </ResponsiveContainer>
           </div>
