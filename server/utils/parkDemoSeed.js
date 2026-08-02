@@ -149,7 +149,7 @@ async function seedParkDemo({ total = 70, manageConnection = true } = {}) {
     await Appointment.destroy({ where: { notes: { [Op.like]: '[FAKE]%' } } });
 
     const today = new Date();
-    const { start: windowStart, end: windowEnd } = lastDaysWindow(90, today);
+    const { start: windowStart, end: windowEnd } = lastDaysWindow(30, today);
     const fromLabel = dateKeyFromLocalDate(windowStart);
     const toLabel = dateKeyFromLocalDate(windowEnd);
     logger.log(`Park demo: seeding ${parkTotal} appointments from ${fromLabel} to ${toLabel}`);
