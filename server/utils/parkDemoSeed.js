@@ -15,7 +15,7 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 
 const { connectDatabase, disconnectDatabase } = require('./database');
-const { SERVICES } = require('../constants/services');
+const SERVICES = require('../constants/services');
 
 const Admin = require('../models/Admin');
 const Appointment = require('../models/Appointment');
@@ -149,7 +149,9 @@ async function seedParkDemo({ total = 70, manageConnection = true } = {}) {
     await Appointment.destroy({ where: { notes: { [Op.like]: '[FAKE]%' } } });
 
     const today = new Date();
-    const { start: windowStart, end: windowEnd } = lastDaysWindow(30, today);
+    // Spread appointments across the last 270 days (~9 months) so the
+    // year-over-year and monthly charts show a realistic distribution.
+    const { start: windowStart, end: windowEnd } = lastDaysWindow(270, today);
     const fromLabel = dateKeyFromLocalDate(windowStart);
     const toLabel = dateKeyFromLocalDate(windowEnd);
     logger.log(`Park demo: seeding ${parkTotal} appointments from ${fromLabel} to ${toLabel}`);
