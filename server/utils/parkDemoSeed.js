@@ -68,7 +68,11 @@ function dateKeyFromLocalDate(d) {
 }
 
 function lastDaysWindow(days, today) {
+  // End at YESTERDAY 23:59:59.999 — never today or future.
+  // This prevents seeded records from appearing in the Dashboard's
+  // "Upcoming appointments" / "Pending requests" sections (popups).
   const end = new Date(today);
+  end.setDate(end.getDate() - 1);
   end.setHours(23, 59, 59, 999);
   const start = new Date(end);
   start.setDate(start.getDate() - days);
@@ -156,14 +160,15 @@ async function seedParkDemo({ total = 70, manageConnection = true } = {}) {
     const toLabel = dateKeyFromLocalDate(windowEnd);
     logger.log(`Park demo: seeding ${parkTotal} appointments from ${fromLabel} to ${toLabel}`);
 
-    // Weighted statuses (heavy on completed / notCompleted / rejected)
+    // Weighted statuses (heavy on completed / notCompleted / rejected).
+    // NOTE: no 'pending' — pending rows appear as "Pending requests" popups
+    // on the Dashboard and would require admin action. Only finalized statuses.
     const parkStatuses = [
       'completed','completed','completed','completed','completed',
       'completed','completed','completed','completed',
       'notCompleted','notCompleted','notCompleted','notCompleted','notCompleted',
       'rejected','rejected','rejected','rejected',
-      'accepted','accepted',
-      'pending'
+      'accepted','accepted'
     ];
 
     const services = Array.isArray(SERVICES) && SERVICES.length ? SERVICES : [

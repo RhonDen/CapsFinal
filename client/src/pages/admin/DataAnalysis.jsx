@@ -129,8 +129,12 @@ const PieLegend = ({ data, colors }) => {
 
 // Draw the service name and count inside donut slices. Only slices large
 // enough to hold both lines show the name; smaller slices show just the count.
+// Returns a <g> with two <text> children — Recharts renders the returned
+// element as-is, so a group is the safest way to show two lines per slice.
 const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value, name, payload }) => {
-  const slicePercent = Number(percent) || 0;
+  // Compute the slice share from the payload total (more reliable than `percent`).
+  const total = Number(payload?.total) || 0;
+  const slicePercent = total > 0 ? Number(value) / total : (Number(percent) || 0);
   if (slicePercent < 0.04) return null;
   const RADIAN = Math.PI / 180;
   const radius = (innerRadius + outerRadius) / 2;
@@ -142,12 +146,12 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, v
   const label = name || payload?.name || '';
 
   let displayName = '';
-  if (slicePercent >= 0.08) {
+  if (slicePercent >= 0.08 && label) {
     displayName = label.length > 18 ? `${label.slice(0, 16)}…` : label;
   }
 
   return (
-    <>
+    <g>
       {displayName && (
         <text
           x={x}
@@ -176,9 +180,9 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, v
         fontSize={12}
         fontWeight={700}
       >
-      {value}
-    </text>
-    </>
+        {value}
+      </text>
+    </g>
   );
 };
 
