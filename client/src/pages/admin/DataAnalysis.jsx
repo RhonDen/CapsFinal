@@ -127,6 +127,33 @@ const PieLegend = ({ data, colors }) => {
   );
 };
 
+// Draw compact count labels inside donut slices (only for slices large enough
+// to avoid overlap). White text with dark outline stays readable on any slice color.
+const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }) => {
+  const slicePercent = Number(percent) || 0;
+  if (slicePercent < 0.05) return null;
+  const RADIAN = Math.PI / 180;
+  const radius = (innerRadius + outerRadius) / 2;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#ffffff"
+      stroke="#0a1830"
+      strokeWidth={1.5}
+      paintOrder="stroke"
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={12}
+      fontWeight={700}
+    >
+      {value}
+    </text>
+  );
+};
+
 function DataAnalysis() {
   const now = new Date();
   const today = getLocalDateKey();
@@ -162,6 +189,11 @@ function DataAnalysis() {
     ? { top: 16, right: 16, bottom: 16, left: 16 }
     : { top: 40, right: 60, bottom: 40, left: 60 };
   const pieHeightClass = isMobile ? 'h-[440px]' : 'h-[560px]';
+
+  const pieTotal = useMemo(() => {
+    const arr = analysisType === 'predictive' ? data.predictivePie : data.pie;
+    return Array.isArray(arr) ? arr.reduce((sum, item) => sum + Number(item.value || 0), 0) : 0;
+  }, [analysisType, data.pie, data.predictivePie]);
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -461,49 +493,51 @@ function DataAnalysis() {
               : 'Most Completed Services'}
           </h2>
 
-          <div className={pieHeightClass}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart margin={pieMargins}>
-                <Pie
-                  data={analysisType === 'predictive' ? data.predictivePie : data.pie}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={pieInnerRadius}
-                  outerRadius={pieOuterRadius}
-                  paddingAngle={2}
-                >
-                  {(analysisType === 'predictive' ? data.predictivePie : data.pie).map(
-                    (entry, index) => {
-                      const isSelected =
-                        analysisType === 'predictive' &&
-                        selectedPredictiveService &&
-                        entry?.name === selectedPredictiveService;
+          <div className="relative">
+            <div className={pieHeightClass}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart margin={pieMargins}>
+                  <Pie
+                    data={analysisType === 'predictive' ? data.predictivePie : data.pie}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={pieInnerRadius}
+                    outerRadius={pieOuterRadius}
+                    paddingAngle={2}
+                    label={renderPieLabel}
+                  >
+                    {(analysisType === 'predictive' ? data.predictivePie : data.pie).map(
+                      (entry, index) => {
+                        const isSelected =
+                          analysisType === 'predictive' &&
+                          selectedPredictiveService &&
+                          entry?.name === selectedPredictiveService;
 
-                      return (
-                        <Cell
-                          key={`${entry.name}-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                          opacity={
-                            analysisType === 'predictive' && selectedPredictiveService
-                              ? isSelected
-                                ? 1
-                                : 0.35
-                              : 1
-                          }
-                          style={{
-                            cursor: analysisType === 'predictive' ? 'pointer' : 'default',
-                          }}
-                          onClick={() => {
-                            if (analysisType !== 'predictive') return;
-                            setSelectedPredictiveService(entry?.name || '');
-                          }}
-                        />
-                      );
-                    }
-                  )}
-                </Pie>
+                        return (
+                          <Cell
+                            key={`${entry.name}-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                            opacity={
+                              analysisType === 'predictive' && selectedPredictiveService
+                                ? isSelected
+                                  ? 1
+                                  : 0.35
+                                : 1
+                            }
+                            style={{
+                              cursor: analysisType === 'predictive' ? 'pointer' : 'default',
+                            }}
+                            onClick={() => {
+                              if (analysisType !== 'predictive') return;
+                              setSelectedPredictiveService(entry?.name || '');
+                            }}
+                          />
+                        );
+                      }
+                    )}
+                  </Pie>
                 <Tooltip
                   formatter={(value, _name, props) => {
                     const name = props?.payload?.name;
@@ -512,6 +546,16 @@ function DataAnalysis() {
                 />
               </PieChart>
             </ResponsiveContainer>
+            </div>
+
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-police dark:text-slate-400">
+                Total
+              </span>
+              <span className="text-2xl font-bold text-maastricht dark:text-slate-100">
+                {pieTotal}
+              </span>
+            </div>
           </div>
 
           <PieLegend
