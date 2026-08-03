@@ -127,30 +127,58 @@ const PieLegend = ({ data, colors }) => {
   );
 };
 
-// Draw compact count labels inside donut slices (only for slices large enough
-// to avoid overlap). White text with dark outline stays readable on any slice color.
-const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }) => {
+// Draw the service name and count inside donut slices. Only slices large
+// enough to hold both lines show the name; smaller slices show just the count.
+const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value, name, payload }) => {
   const slicePercent = Number(percent) || 0;
-  if (slicePercent < 0.05) return null;
+  if (slicePercent < 0.04) return null;
   const RADIAN = Math.PI / 180;
   const radius = (innerRadius + outerRadius) / 2;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  // Only slices with at least 8% get the full two-line label (name + count).
+  // Smaller slices just show the count so text never collides.
+  const label = name || payload?.name || '';
+
+  let displayName = '';
+  if (slicePercent >= 0.08) {
+    displayName = label.length > 18 ? `${label.slice(0, 16)}…` : label;
+  }
+
   return (
-    <text
-      x={x}
-      y={y}
-      fill="#ffffff"
-      stroke="#0a1830"
-      strokeWidth={1.5}
-      paintOrder="stroke"
-      textAnchor="middle"
-      dominantBaseline="central"
-      fontSize={12}
-      fontWeight={700}
-    >
+    <>
+      {displayName && (
+        <text
+          x={x}
+          y={y - 7}
+          fill="#ffffff"
+          stroke="#0a1830"
+          strokeWidth={1.5}
+          paintOrder="stroke"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={slicePercent >= 0.15 ? 10 : 9}
+          fontWeight={600}
+        >
+          {displayName}
+        </text>
+      )}
+      <text
+        x={x}
+        y={displayName ? y + 7 : y}
+        fill="#ffffff"
+        stroke="#0a1830"
+        strokeWidth={1.5}
+        paintOrder="stroke"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={12}
+        fontWeight={700}
+      >
       {value}
     </text>
+    </>
   );
 };
 
