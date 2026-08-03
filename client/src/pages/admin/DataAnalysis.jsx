@@ -137,7 +137,9 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, v
   const slicePercent = total > 0 ? Number(value) / total : (Number(percent) || 0);
   if (slicePercent < 0.04) return null;
   const RADIAN = Math.PI / 180;
-  const radius = (innerRadius + outerRadius) / 2;
+  // Sit the label at ~62% of the band width (closer to the inner edge).
+  // Keeps text well inside the donut, so it never crosses the chart boundary.
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.62;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
@@ -215,12 +217,13 @@ function DataAnalysis() {
 
   const viewportWidth = useViewportWidth();
   const isMobile = viewportWidth < 640;
-  const pieOuterRadius = isMobile ? 90 : 140;
-  const pieInnerRadius = isMobile ? 45 : 70;
+  // Enlarged pie so the donut + inner labels comfortably fit the chart area.
+  const pieOuterRadius = isMobile ? 110 : 170;
+  const pieInnerRadius = isMobile ? 50 : 85;
   const pieMargins = isMobile
-    ? { top: 16, right: 16, bottom: 16, left: 16 }
-    : { top: 40, right: 60, bottom: 40, left: 60 };
-  const pieHeightClass = isMobile ? 'h-[440px]' : 'h-[560px]';
+    ? { top: 30, right: 30, bottom: 30, left: 30 }
+    : { top: 60, right: 80, bottom: 60, left: 80 };
+  const pieHeightClass = isMobile ? 'h-[520px]' : 'h-[680px]';
 
   const pieTotal = useMemo(() => {
     const arr = analysisType === 'predictive' ? data.predictivePie : data.pie;
