@@ -132,7 +132,13 @@ const startServer = async () => {
     const { Op } = require('sequelize');
     try {
       const purgedFake = await Appointment.destroy({
-        where: { notes: { [Op.like]: '%FAKE%' } },
+        where: {
+          [Op.or]: [
+            { notes: { [Op.like]: '%FAKE%' } },
+            { email: { [Op.like]: '%@example.com' } },
+            { notes: { [Op.like]: '%Park demo%' } },
+          ],
+        },
       });
       if (purgedFake > 0) {
         console.log(`Purged ${purgedFake} fake/demo appointment(s) from database.`);
