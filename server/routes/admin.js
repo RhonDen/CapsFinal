@@ -685,24 +685,46 @@ router.get(
       order: [['scheduledStart', 'DESC'], ['id', 'DESC']]
     });
 
-    const clients = allAppts.map((a) => {
+    // Group by phone number to avoid duplicate client rows.
+    // Each client appears once with their most recent appointment,
+    // consolidated names, and a total appointment count.
+    const clientMap = new Map();
+    for (const a of allAppts) {
+      const number = a.number || '';
       const displayName = [a.firstName, a.lastName].filter(Boolean).join(' ') || 'Unknown';
       const apptDate = a.scheduledStart || a.date || a.createdAt;
-      return {
-        id: a.id,
-        number: a.number || '',
-        fullName: displayName,
-        allNames: [displayName],
-        lastAppointment: apptDate,
-        appointmentCount: 1,
-        service: a.service || '',
-        status: a.status || '',
-        dateKey: a.dateKey || null,
-        createdAt: a.createdAt,
-      };
-    });
 
-    res.json(clients);
+      if (!clientMap.has(number)) {
+        clientMap.set(number, {
+          id: a.id,
+          number,
+          fullName: displayName,
+          allNames: [displayName],
+          lastAppointment: apptDate,
+          appointmentCount: 1,
+          service: a.service || '',
+          status: a.status || '',
+          dateKey: a.dateKey || null,
+          createdAt: a.createdAt,
+        });
+      } else {
+        const existing = clientMap.get(number);
+        existing.appointmentCount += 1;
+        // Keep the most recent appointment.
+        if (new Date(apptDate) > new Date(existing.lastAppointment)) {
+          existing.lastAppointment = apptDate;
+          existing.fullName = displayName;
+          existing.service = a.service || '';
+          existing.status = a.status || '';
+        }
+        // Collect all names for this client.
+        if (!existing.allNames.includes(displayName)) {
+          existing.allNames.push(displayName);
+        }
+      }
+    }
+
+    res.json(Array.from(clientMap.values()));
   })
 );
 

@@ -48,26 +48,36 @@ function Clients() {
     fetchClients();
   }, []);
 
-  // Flat list — no phone-number grouping. Searchable by name or phone digits.
+  // Searchable by name or phone digits. Uses word-boundary matching for names
+  // and exact last-10-digit matching for phone numbers to avoid unrelated results.
   const filteredClients = useMemo(() => {
     let result = clients;
     const nameQuery = searchQuery.trim().toLowerCase();
     const phoneQuery = phoneFilter.replace(/\D/g, '').trim();
 
     if (nameQuery) {
+      // Match on whole words so partial substrings don't bring unrelated clients.
+      const nameParts = nameQuery.split(/\s+/).filter(Boolean);
       result = result.filter((client) => {
-        const name = getClientName(client).toLowerCase();
-        const allNames = Array.isArray(client.allNames) ? client.allNames : [];
-        return (
-          name.includes(nameQuery) ||
-          allNames.some((n) => String(n || '').toLowerCase().includes(nameQuery))
-        );
+        const namePartsList = [
+          getClientName(client).toLowerCase(),
+          ...(Array.isArray(client.allNames) ? client.allNames : []).map((n) =>
+            String(n || '').toLowerCase()
+          ),
+        ];
+        const allNameText = namePartsList.join(' ');
+        return nameParts.every((part) => {
+          // Match if the part appears as a whole word (boundary) in any name.
+          const escaped = part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          return new RegExp(`(^|\\s)${escaped}(\\s|$)`).test(allNameText);
+        });
       });
     }
     if (phoneQuery) {
+      // Match the last 10 digits of the stored phone number exactly.
       result = result.filter((client) => {
         const digits = String(client.number || '').replace(/\D/g, '');
-        return digits.includes(phoneQuery);
+        return digits.slice(-10) === phoneQuery.slice(-10);
       });
     }
     return result;
