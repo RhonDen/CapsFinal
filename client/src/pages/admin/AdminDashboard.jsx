@@ -229,7 +229,7 @@ function AdminDashboard() {
 
   return (
     <AdminPageShell title={null} description={null} icon={LayoutDashboard} backTo={null}>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {error ? (
           <p className="rounded-2xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-400">{error}</p>
         ) : null}
@@ -247,58 +247,55 @@ function AdminDashboard() {
               </div>
             ) : null}
 
-            <div className="overflow-hidden rounded-[36px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-6 shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] dark:border-slate-700 dark:bg-slate-800/90">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.28em] text-silver-lake dark:text-slate-400">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-silver-lake dark:text-slate-400">
                     Clinic command center
                   </p>
-                  <h1 className="mt-2 text-3xl font-semibold text-maastricht dark:text-slate-100">Admin overview</h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-7 text-police dark:text-slate-400">
-                    Keep the day organized with a calmer layout that gives each section more breathing room.
-                  </p>
+                  <h1 className="mt-1 text-2xl font-semibold text-maastricht dark:text-slate-100">Admin overview</h1>
                 </div>
-                <div className="rounded-[24px] border border-white/70 bg-white/70 px-4 py-3 text-sm text-police shadow-sm dark:border-slate-700 dark:bg-slate-700/70 dark:text-slate-300">
+                <div className="rounded-2xl border border-white/70 bg-white/70 px-3 py-2 text-sm text-police shadow-sm dark:border-slate-700 dark:bg-slate-700/70 dark:text-slate-300">
                   <span className="font-semibold text-maastricht dark:text-slate-100">{todayLabel || 'Today'}</span>
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-5">
-                <div className="rounded-[24px] border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-700/70">
-                  <p className="mb-2 text-sm font-semibold text-silver-lake dark:text-slate-400">Pending Requests</p>
-                  <p className="text-4xl font-bold text-maastricht dark:text-slate-100">{dashboard.stats.pendingRequests}</p>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-5">
+                <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-700/70">
+                  <p className="mb-1 text-xs font-semibold text-silver-lake dark:text-slate-400">Pending Requests</p>
+                  <p className="text-2xl font-bold text-maastricht dark:text-slate-100">{dashboard.stats.pendingRequests}</p>
                 </div>
-                <div className="rounded-[24px] border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-700/70">
-                  <p className="mb-2 text-sm font-semibold text-silver-lake dark:text-slate-400">Approved Today</p>
-                  <p className="text-4xl font-bold text-maastricht dark:text-slate-100">{dashboard.stats.approvedToday}</p>
+                <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-700/70">
+                  <p className="mb-1 text-xs font-semibold text-silver-lake dark:text-slate-400">Approved Today</p>
+                  <p className="text-2xl font-bold text-maastricht dark:text-slate-100">{dashboard.stats.approvedToday}</p>
                 </div>
-                <div className="rounded-[24px] border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-700/70">
-                  <p className="mb-2 text-sm font-semibold text-silver-lake dark:text-slate-400">Rejected Today</p>
-                  <p className="text-4xl font-bold text-maastricht dark:text-slate-100">{dashboard.stats.rejectedToday}</p>
+                <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-700/70">
+                  <p className="mb-1 text-xs font-semibold text-silver-lake dark:text-slate-400">Rejected Today</p>
+                  <p className="text-2xl font-bold text-maastricht dark:text-slate-100">{dashboard.stats.rejectedToday}</p>
                 </div>
-                <div className="rounded-[24px] border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-700/70">
-                  <p className="mb-2 text-sm font-semibold text-silver-lake dark:text-slate-400">Completed Today</p>
-                  <p className="text-4xl font-bold text-maastricht dark:text-slate-100">{dashboard.stats.completedToday}</p>
+                <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-700/70">
+                  <p className="mb-1 text-xs font-semibold text-silver-lake dark:text-slate-400">Completed Today</p>
+                  <p className="text-2xl font-bold text-maastricht dark:text-slate-100">{dashboard.stats.completedToday}</p>
                 </div>
-                <div className="rounded-[24px] border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-700/70">
-                  <p className="mb-2 text-sm font-semibold text-silver-lake dark:text-slate-400">Not Completed Today</p>
-                  <p className="text-4xl font-bold text-maastricht dark:text-slate-100">{dashboard.stats.notCompletedToday}</p>
+                <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-700/70">
+                  <p className="mb-1 text-xs font-semibold text-silver-lake dark:text-slate-400">Not Completed Today</p>
+                  <p className="text-2xl font-bold text-maastricht dark:text-slate-100">{dashboard.stats.notCompletedToday}</p>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-2xl font-semibold text-maastricht dark:text-slate-100">Quick actions</h2>
-                  <p className="text-sm text-police dark:text-slate-400">Jump to key admin tools without losing your place.</p>
+                  <h2 className="text-xl font-semibold text-maastricht dark:text-slate-100">Quick actions</h2>
+                  <p className="text-xs text-police dark:text-slate-400">Jump to key admin tools without losing your place.</p>
                 </div>
-                <div className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-police dark:bg-slate-700 dark:text-slate-300">
+                <div className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-police dark:bg-slate-700 dark:text-slate-300">
                   6 shortcuts
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
                 {QUICK_LINKS.map((item) => {
                   const Icon = item.icon;
                   const badgeValue = item.badgeKey === 'unreadCount' ? unreadCount : 0;
@@ -307,12 +304,12 @@ function AdminDashboard() {
                     <Link
                       key={item.to}
                       to={item.to}
-                      className={`relative flex items-center gap-3 rounded-[22px] p-5 transition ${item.tone}`}
+                      className={`relative flex items-center gap-2 rounded-2xl p-3 transition ${item.tone}`}
                     >
-                      <Icon className="h-6 w-6 shrink-0" />
-                      <p className="truncate text-base font-semibold">{item.label}</p>
+                      <Icon className="h-5 w-5 shrink-0" />
+                      <p className="truncate text-sm font-semibold">{item.label}</p>
                       {hasBadge && (
-                        <span className="absolute right-3 top-3 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white shadow-lg ring-2 ring-white/30">
+                        <span className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white shadow-lg ring-2 ring-white/30">
                           {badgeValue > 9 ? '9+' : badgeValue}
                         </span>
                       )}
@@ -322,33 +319,33 @@ function AdminDashboard() {
               </div>
             </div>
 
-            <div className="grid gap-6 2xl:grid-cols-[1.15fr_0.85fr]">
-              <div className="space-y-6">
-                <section className="rounded-[36px] border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
-                  <div className="mb-6 flex items-center justify-between gap-3">
+            <div className="grid gap-4 2xl:grid-cols-[1.15fr_0.85fr]">
+              <div className="space-y-4">
+                <section className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
+                  <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-2xl font-semibold text-maastricht dark:text-slate-100">Pending requests</h2>
-                      <p className="text-sm text-police dark:text-slate-400">Approve or reject new bookings after OTP verification.</p>
+                      <h2 className="text-xl font-semibold text-maastricht dark:text-slate-100">Pending requests</h2>
+                      <p className="text-xs text-police dark:text-slate-400">Approve or reject new bookings after OTP verification.</p>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {dashboard.pendingAppointments.map((appointment) => (
                       <article
                         key={appointment.id}
-                        className="rounded-[28px] border border-slate-200 bg-slate-50/80 p-6 dark:border-slate-600 dark:bg-slate-700"
+                        className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-600 dark:bg-slate-700"
                       >
-                        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                           <div className="min-w-0">
-                            <div className="mb-2 flex flex-wrap items-center gap-2">{typePill(appointment)}</div>
-                            <h3 className="break-words text-xl font-semibold text-maastricht dark:text-slate-100">
+                            <div className="mb-1.5 flex flex-wrap items-center gap-2">{typePill(appointment)}</div>
+                            <h3 className="break-words text-lg font-semibold text-maastricht dark:text-slate-100">
                               {appointment.fullName}
                             </h3>
-                            <p className="mt-1 text-lg font-semibold text-police dark:text-slate-300">{appointment.number}</p>
+                            <p className="mt-0.5 text-base font-semibold text-police dark:text-slate-300">{appointment.number}</p>
                           </div>
 
                           <span
-                            className={`mt-1 inline-flex w-max items-center justify-center rounded-full px-4 py-2 text-sm font-semibold ${getStatusTone(
+                            className={`mt-1 inline-flex w-max items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusTone(
                               appointment.status
                             )}`}
                           >
@@ -357,33 +354,33 @@ function AdminDashboard() {
                         </div>
 
                         <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                          <div className="rounded-2xl bg-white/70 p-4 dark:bg-slate-800/60">
+                          <div className="rounded-xl bg-white/70 p-3 dark:bg-slate-800/60">
                             <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Service</p>
-                            <p className="mt-1 text-base font-semibold text-maastricht dark:text-slate-100">
+                            <p className="mt-0.5 text-sm font-semibold text-maastricht dark:text-slate-100">
                               {formatServiceLabel(appointment.service)}
                             </p>
                           </div>
-                          <div className="rounded-2xl bg-white/70 p-4 dark:bg-slate-800/60">
+                          <div className="rounded-xl bg-white/70 p-3 dark:bg-slate-800/60">
                             <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Time</p>
-                            <p className="mt-1 text-base font-semibold text-maastricht dark:text-slate-100">
+                            <p className="mt-0.5 text-sm font-semibold text-maastricht dark:text-slate-100">
                               {formatDateKey(appointment.dateKey, { month: 'long', day: 'numeric', year: 'numeric' })} at{' '}
                               {formatTimeLabel(appointment.time)}
                             </p>
-                            <p className="mt-1 text-sm text-police dark:text-slate-300">Slot length: {appointment.durationMinutes} minutes</p>
+                            <p className="mt-0.5 text-xs text-police dark:text-slate-300">Slot length: {appointment.durationMinutes} minutes</p>
                           </div>
                         </div>
 
-                        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                           <button
                             type="button"
                             onClick={() => updateStatus(appointment.id, 'accepted')}
                             disabled={!appointment.canApprove || statusLoadingId === `${appointment.id}:accepted`}
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-base font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
                           >
                             {statusLoadingId === `${appointment.id}:accepted` ? (
-                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <CheckCircle2 className="h-5 w-5" />
+                              <CheckCircle2 className="h-4 w-4" />
                             )}
                             Approve
                           </button>
@@ -391,19 +388,19 @@ function AdminDashboard() {
                             type="button"
                             onClick={() => setRejectModal({ open: true, appointmentId: appointment.id })}
                             disabled={statusLoadingId === `${appointment.id}:rejected`}
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-600 px-5 py-3 text-base font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
                           >
                             {statusLoadingId === `${appointment.id}:rejected` ? (
-                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <XCircle className="h-5 w-5" />
+                              <XCircle className="h-4 w-4" />
                             )}
                             Reject
                           </button>
                         </div>
 
                         {!appointment.canApprove ? (
-                          <p className="mt-3 text-sm text-amber-700">
+                          <p className="mt-2 text-xs text-amber-700">
                             This booking cannot be approved until it has a valid scheduled time.
                           </p>
                         ) : null}
@@ -412,40 +409,40 @@ function AdminDashboard() {
                   </div>
 
                   {dashboard.pendingAppointments.length === 0 ? (
-                    <div className="mt-4 rounded-[28px] border border-dashed border-slate-300 bg-slate-50/80 p-8 text-sm text-police dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                    <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-sm text-police dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
                       No pending requests right now.
                     </div>
                   ) : null}
                 </section>
 
-                <section className="rounded-[36px] border border-amber-200 bg-amber-50/60 p-6 shadow-sm dark:border-amber-700/50 dark:bg-amber-900/20">
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-semibold text-maastricht dark:text-slate-100">Pending outcome</h2>
-                    <p className="text-sm text-police dark:text-slate-400">
+                <section className="rounded-3xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm dark:border-amber-700/50 dark:bg-amber-900/20">
+                  <div className="mb-4">
+                    <h2 className="text-xl font-semibold text-maastricht dark:text-slate-100">Pending outcome</h2>
+                    <p className="text-xs text-police dark:text-slate-400">
                       Walk-in appointments that passed their scheduled time but were not yet marked as completed or not completed.
                     </p>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {(dashboard.pendingOutcomeAppointments || []).map((appointment) => (
                       <article
                         key={appointment.id}
-                        className="rounded-[28px] border border-amber-200 bg-white p-6 shadow-sm dark:border-amber-700/50 dark:bg-slate-700"
+                        className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-700/50 dark:bg-slate-700"
                       >
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                           <div className="min-w-0">
                             <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Name</p>
-                            <h3 className="mt-1 break-words text-xl font-semibold text-maastricht dark:text-slate-100">{appointment.fullName}</h3>
+                            <h3 className="mt-0.5 break-words text-lg font-semibold text-maastricht dark:text-slate-100">{appointment.fullName}</h3>
                           </div>
 
                           <div className="min-w-0">
                             <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Service</p>
-                            <p className="mt-1 text-lg font-semibold text-police dark:text-slate-200">{formatServiceLabel(appointment.service)}</p>
+                            <p className="mt-0.5 text-base font-semibold text-police dark:text-slate-200">{formatServiceLabel(appointment.service)}</p>
                           </div>
 
                           <div className="min-w-0 md:col-span-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Time</p>
-                            <p className="mt-1 text-lg font-semibold text-maastricht dark:text-slate-100">
+                            <p className="mt-0.5 text-base font-semibold text-maastricht dark:text-slate-100">
                               {formatDateKey(appointment.dateKey, { month: 'long', day: 'numeric', year: 'numeric' })} at {formatTimeLabel(appointment.time)}
                               <span className="text-police dark:text-slate-300">
                                 {appointment.time && appointment.durationMinutes ? ' to ' : ''}
@@ -457,10 +454,10 @@ function AdminDashboard() {
                           </div>
                         </div>
 
-                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span
-                              className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold ${getStatusTone(
+                              className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusTone(
                                 appointment.status
                               )}`}
                             >
@@ -469,17 +466,17 @@ function AdminDashboard() {
                             <div>{typePill(appointment)}</div>
                           </div>
 
-                          <div className="flex flex-col gap-3 sm:flex-row">
+                          <div className="flex flex-col gap-2 sm:flex-row">
                             <button
                               type="button"
                               onClick={() => updateStatus(appointment.id, 'completed')}
                               disabled={statusLoadingId === `${appointment.id}:completed`}
-                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-base font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
                             >
                               {statusLoadingId === `${appointment.id}:completed` ? (
-                                <Loader2 className="h-5 w-5 animate-spin" />
+                                <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
-                                <CheckCircle2 className="h-5 w-5" />
+                                <CheckCircle2 className="h-4 w-4" />
                               )}
                               Completed
                             </button>
@@ -487,12 +484,12 @@ function AdminDashboard() {
                               type="button"
                               onClick={() => updateStatus(appointment.id, 'notCompleted')}
                               disabled={statusLoadingId === `${appointment.id}:notCompleted`}
-                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-700 px-5 py-3 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                             >
                               {statusLoadingId === `${appointment.id}:notCompleted` ? (
-                                <Loader2 className="h-5 w-5 animate-spin" />
+                                <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
-                                <Clock3 className="h-5 w-5" />
+                                <Clock3 className="h-4 w-4" />
                               )}
                               Not Completed
                             </button>
@@ -503,19 +500,19 @@ function AdminDashboard() {
                   </div>
 
                   {(dashboard.pendingOutcomeAppointments || []).length === 0 ? (
-                    <div className="mt-4 rounded-[28px] border border-dashed border-amber-300 bg-white/60 p-8 text-sm text-police dark:border-amber-700/50 dark:bg-slate-700 dark:text-slate-300">
+                    <div className="mt-3 rounded-2xl border border-dashed border-amber-300 bg-white/60 p-6 text-sm text-police dark:border-amber-700/50 dark:bg-slate-700 dark:text-slate-300">
                       No walk-in appointments are waiting for an outcome.
                     </div>
                   ) : null}
                 </section>
 
-                <section className="rounded-[36px] border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-semibold text-maastricht dark:text-slate-100">Today&apos;s schedule</h2>
-                    <p className="text-sm text-police dark:text-slate-400">A cleaner daily layout for the appointments that matter most today.</p>
+                <section className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
+                  <div className="mb-4">
+                    <h2 className="text-xl font-semibold text-maastricht dark:text-slate-100">Today&apos;s schedule</h2>
+                    <p className="text-xs text-police dark:text-slate-400">A cleaner daily layout for the appointments that matter most today.</p>
                   </div>
 
-                  <div className="hidden rounded-[28px] border border-slate-200 bg-slate-50 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-silver-lake dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 xl:grid xl:grid-cols-12">
+                  <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-silver-lake dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 xl:grid xl:grid-cols-12">
                     <div className="col-span-3">Name</div>
                     <div className="col-span-3">Service</div>
                     <div className="col-span-3">Time</div>
@@ -526,34 +523,34 @@ function AdminDashboard() {
                   <div className="pt-2">
                     <div className="max-h-[70vh] overflow-y-auto pr-1">
                       {dashboard.todayAppointments.length === 0 ? (
-                        <div className="mt-4 rounded-[28px] border border-dashed border-slate-300 bg-slate-50/80 p-8 text-sm text-police dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                        <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-sm text-police dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
                           No approved, rejected, completed, or not completed appointments for today yet.
                         </div>
                       ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           {dashboard.todayAppointments.map((appointment) => (
                             <article
                               key={appointment.id}
-                              className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-600 dark:bg-slate-700"
+                              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-600 dark:bg-slate-700"
                             >
-                              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12">
+                              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-12">
                                 <div className="min-w-0 xl:col-span-3">
                                   <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Name</p>
-                                  <h3 className="mt-1 line-clamp-2 break-words text-xl font-semibold text-maastricht dark:text-slate-100">
+                                  <h3 className="mt-0.5 line-clamp-2 break-words text-lg font-semibold text-maastricht dark:text-slate-100">
                                     {appointment.fullName}
                                   </h3>
                                 </div>
 
                                 <div className="min-w-0 xl:col-span-3">
                                   <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Service</p>
-                                  <p className="mt-1 line-clamp-2 break-words text-lg font-semibold text-police dark:text-slate-200">
+                                  <p className="mt-0.5 line-clamp-2 break-words text-base font-semibold text-police dark:text-slate-200">
                                     {formatServiceLabel(appointment.service)}
                                   </p>
                                 </div>
 
                                 <div className="min-w-0 xl:col-span-3">
                                   <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Time</p>
-                                  <p className="mt-1 line-clamp-2 break-words text-lg font-semibold text-maastricht dark:text-slate-100">
+                                  <p className="mt-0.5 line-clamp-2 break-words text-base font-semibold text-maastricht dark:text-slate-100">
                                     {formatTimeLabel(appointment.time)}
                                     <span className="text-police dark:text-slate-300">
                                       {appointment.time && appointment.durationMinutes ? ' to ' : ''}
@@ -566,20 +563,20 @@ function AdminDashboard() {
 
                                 <div className="min-w-0 xl:col-span-2">
                                   <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Number</p>
-                                  <p className="mt-1 line-clamp-1 break-words text-lg font-semibold text-police dark:text-slate-200">
+                                  <p className="mt-0.5 line-clamp-1 break-words text-base font-semibold text-police dark:text-slate-200">
                                     {appointment.number}
                                   </p>
                                 </div>
 
                                 <div className="xl:col-span-1">
                                   <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Type</p>
-                                  <div className="mt-2">{typePill(appointment)}</div>
+                                  <div className="mt-1.5">{typePill(appointment)}</div>
                                 </div>
                               </div>
 
-                              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                                 <span
-                                  className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold ${getStatusTone(
+                                  className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusTone(
                                     appointment.status
                                   )}`}
                                 >
@@ -588,17 +585,17 @@ function AdminDashboard() {
 
                                 {appointment.status === 'accepted' ? (
                                   appointment.canMarkOutcome ? (
-                                    <div className="flex flex-col gap-3 sm:flex-row">
+                                    <div className="flex flex-col gap-2 sm:flex-row">
                                       <button
                                         type="button"
                                         onClick={() => updateStatus(appointment.id, 'completed')}
                                         disabled={statusLoadingId === `${appointment.id}:completed`}
-                                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-base font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
                                       >
                                         {statusLoadingId === `${appointment.id}:completed` ? (
-                                          <Loader2 className="h-5 w-5 animate-spin" />
+                                          <Loader2 className="h-4 w-4 animate-spin" />
                                         ) : (
-                                          <CheckCircle2 className="h-5 w-5" />
+                                          <CheckCircle2 className="h-4 w-4" />
                                         )}
                                         Completed
                                       </button>
@@ -606,18 +603,18 @@ function AdminDashboard() {
                                         type="button"
                                         onClick={() => updateStatus(appointment.id, 'notCompleted')}
                                         disabled={statusLoadingId === `${appointment.id}:notCompleted`}
-                                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-700 px-5 py-3 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                                       >
                                         {statusLoadingId === `${appointment.id}:notCompleted` ? (
-                                          <Loader2 className="h-5 w-5 animate-spin" />
+                                          <Loader2 className="h-4 w-4 animate-spin" />
                                         ) : (
-                                          <Clock3 className="h-5 w-5" />
+                                          <Clock3 className="h-4 w-4" />
                                         )}
                                         Not Completed
                                       </button>
                                     </div>
                                   ) : (
-                                    <div className="rounded-2xl bg-slate-50 p-4 text-sm text-police dark:bg-slate-800/60 dark:text-slate-300">
+                                    <div className="rounded-xl bg-slate-50 p-3 text-sm text-police dark:bg-slate-800/60 dark:text-slate-300">
                                       Outcome buttons open when the appointment starts at {formatTimeLabel(appointment.time)}.
                                     </div>
                                   )
@@ -632,33 +629,33 @@ function AdminDashboard() {
                 </section>
               </div>
 
-              <div className="space-y-6">
-                <section className="rounded-[36px] border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-semibold text-maastricht dark:text-slate-100">Upcoming appointments</h2>
-                    <p className="text-sm text-police dark:text-slate-400">The next closest approved schedules from now.</p>
+              <div className="space-y-4">
+                <section className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
+                  <div className="mb-4">
+                    <h2 className="text-xl font-semibold text-maastricht dark:text-slate-100">Upcoming appointments</h2>
+                    <p className="text-xs text-police dark:text-slate-400">The next closest approved schedules from now.</p>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {(dashboard.upcomingAppointments || []).map((appointment) => (
                       <article
                         key={appointment.id}
-                        className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-600 dark:bg-slate-700"
+                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-600 dark:bg-slate-700"
                       >
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                           <div className="min-w-0">
                             <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Name</p>
-                            <h3 className="mt-1 break-words text-xl font-semibold text-maastricht dark:text-slate-100">{appointment.fullName}</h3>
+                            <h3 className="mt-0.5 break-words text-lg font-semibold text-maastricht dark:text-slate-100">{appointment.fullName}</h3>
                           </div>
 
                           <div className="min-w-0">
                             <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Service</p>
-                            <p className="mt-1 text-lg font-semibold text-police dark:text-slate-200">{formatServiceLabel(appointment.service)}</p>
+                            <p className="mt-0.5 text-base font-semibold text-police dark:text-slate-200">{formatServiceLabel(appointment.service)}</p>
                           </div>
 
                           <div className="min-w-0 md:col-span-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Time</p>
-                            <p className="mt-1 text-lg font-semibold text-maastricht dark:text-slate-100">
+                            <p className="mt-0.5 text-base font-semibold text-maastricht dark:text-slate-100">
                               {formatDateKey(appointment.dateKey, { month: 'long', day: 'numeric', year: 'numeric' })} at {formatTimeLabel(appointment.time)}
                               <span className="text-police dark:text-slate-300">
                                 {appointment.time && appointment.durationMinutes ? ' to ' : ''}
@@ -670,9 +667,9 @@ function AdminDashboard() {
                           </div>
                         </div>
 
-                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                           <span
-                            className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold ${getStatusTone(
+                            className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusTone(
                               appointment.status
                             )}`}
                           >
@@ -685,7 +682,7 @@ function AdminDashboard() {
                   </div>
 
                   {(dashboard.upcomingAppointments || []).length === 0 ? (
-                    <div className="mt-4 rounded-[28px] border border-dashed border-slate-300 bg-slate-50/80 p-8 text-sm text-police dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                    <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-sm text-police dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
                       No upcoming approved appointments.
                     </div>
                   ) : null}
