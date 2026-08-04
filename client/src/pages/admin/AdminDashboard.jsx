@@ -78,6 +78,7 @@ const INITIAL_DASHBOARD = {
   pendingAppointments: [],
   todayAppointments: [],
   upcomingAppointments: [],
+  pendingOutcomeAppointments: [],
 };
 
 function AdminDashboard() {
@@ -416,6 +417,97 @@ function AdminDashboard() {
                   {dashboard.pendingAppointments.length === 0 ? (
                     <div className="mt-4 rounded-[28px] border border-dashed border-slate-300 bg-slate-50/80 p-8 text-sm text-police dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
                       No pending requests right now.
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className="rounded-[36px] border border-amber-200 bg-amber-50/60 p-6 shadow-sm dark:border-amber-700/50 dark:bg-amber-900/20">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-semibold text-maastricht dark:text-slate-100">Pending outcome</h2>
+                    <p className="text-sm text-police dark:text-slate-400">
+                      Walk-in appointments that passed their scheduled time but were not yet marked as completed or not completed.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {(dashboard.pendingOutcomeAppointments || []).map((appointment) => (
+                      <article
+                        key={appointment.id}
+                        className="rounded-[28px] border border-amber-200 bg-white p-6 shadow-sm dark:border-amber-700/50 dark:bg-slate-700"
+                      >
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Name</p>
+                            <h3 className="mt-1 break-words text-xl font-semibold text-maastricht dark:text-slate-100">{appointment.fullName}</h3>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Service</p>
+                            <p className="mt-1 text-lg font-semibold text-police dark:text-slate-200">{formatServiceLabel(appointment.service)}</p>
+                          </div>
+
+                          <div className="min-w-0 md:col-span-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Time</p>
+                            <p className="mt-1 text-lg font-semibold text-maastricht dark:text-slate-100">
+                              {formatDateKey(appointment.dateKey, { month: 'long', day: 'numeric', year: 'numeric' })} at {formatTimeLabel(appointment.time)}
+                              <span className="text-police dark:text-slate-300">
+                                {appointment.time && appointment.durationMinutes ? ' to ' : ''}
+                              </span>
+                              {appointment.time && appointment.durationMinutes
+                                ? computeEndTimeLabel(appointment.time, appointment.durationMinutes)
+                                : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold ${getStatusTone(
+                                appointment.status
+                              )}`}
+                            >
+                              {appointment.statusLabel}
+                            </span>
+                            <div>{typePill(appointment)}</div>
+                          </div>
+
+                          <div className="flex flex-col gap-3 sm:flex-row">
+                            <button
+                              type="button"
+                              onClick={() => updateStatus(appointment.id, 'completed')}
+                              disabled={statusLoadingId === `${appointment.id}:completed`}
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-base font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {statusLoadingId === `${appointment.id}:completed` ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-5 w-5" />
+                              )}
+                              Completed
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateStatus(appointment.id, 'notCompleted')}
+                              disabled={statusLoadingId === `${appointment.id}:notCompleted`}
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-700 px-5 py-3 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {statusLoadingId === `${appointment.id}:notCompleted` ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                              ) : (
+                                <Clock3 className="h-5 w-5" />
+                              )}
+                              Not Completed
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+
+                  {(dashboard.pendingOutcomeAppointments || []).length === 0 ? (
+                    <div className="mt-4 rounded-[28px] border border-dashed border-amber-300 bg-white/60 p-8 text-sm text-police dark:border-amber-700/50 dark:bg-slate-700 dark:text-slate-300">
+                      No walk-in appointments are waiting for an outcome.
                     </div>
                   ) : null}
                 </section>

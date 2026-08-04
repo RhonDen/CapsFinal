@@ -155,6 +155,44 @@ const startServer = async () => {
       console.log(`Serving React from: ${clientDistPath}`);
     });
 
+    // ── Background job: auto-mark no-show online appointments ──────────────
+    // Every 5 minutes, find online appointments (isWalkIn = false) that are
+    // still 'accepted' but whose scheduled end time has passed, and mark them
+    // as 'notCompleted'. Walk-ins are intentionally NOT auto-marked — they
+    // remain visible in the dashboard's "Pending Outcome" section until the
+    // admin manually marks them as completed or not completed.
+    const { Op } = require('sequelize');
+    const Appointment = require('./models/Appointment');
+
+    const autoMarkNoShowOnlineAppointments = async () => {
+      try {
+        const now = new Date();
+
+        const overdueOnlineAppointments = await Appointment.findAll({
+          where: {
+            isWalkIn: false,
+            status: 'accepted',
+            scheduledEnd: { [Op.lt]: now },
+          },
+        });
+
+        for (const appointment of overdueOnlineAppointments) {
+          appointment.status = 'notCompleted';
+          await appointment.save();
+        }
+
+        if (overdueOnlineAppointments.length > 0) {
+          console.log(`Auto-marked ${overdueOnlineAppointments.length} no-show online appointment(s) as not completed.`);
+        }
+      } catch (error) {
+        console.error('Auto-mark no-show online appointments error:', error.message);
+      }
+    };
+
+    // Run once shortly after startup, then every 5 minutes.
+    setTimeout(autoMarkNoShowOnlineAppointments, 10 * 1000);
+    setInterval(autoMarkNoShowOnlineAppointments, 5 * 60 * 1000);
+
     // In dev, keep behavior predictable.
     // If the port is already in use, fail fast so you don't end up with a "random" setup.
     server.on('error', (err) => {

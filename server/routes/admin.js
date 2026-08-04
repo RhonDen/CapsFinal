@@ -255,6 +255,30 @@ router.get('/check-auth', auth, (req, res) => {
   res.json({ authenticated: true, admin: req.admin });
 });
 
+// Auto-mark online appointments that have passed their scheduled time
+// and were never marked as completed/notCompleted by the admin.
+// Walk-ins are intentionally NOT auto-marked — they remain visible
+// in the dashboard's "Pending Outcome" section until the admin
+// manually marks them as completed or not completed.
+const autoMarkNoShowOnlineAppointments = async () => {
+  const now = new Date();
+
+  const overdueOnlineAppointments = await Appointment.findAll({
+    where: {
+      isWalkIn: false,
+      status: 'accepted',
+      scheduledEnd: { [Op.lt]: now },
+    },
+  });
+
+  for (const appointment of overdueOnlineAppointments) {
+    appointment.status = 'notCompleted';
+    await appointment.save();
+  }
+
+  return overdueOnlineAppointments.length;
+};
+
 router.get(
   '/dashboard',
   auth,
@@ -262,13 +286,16 @@ router.get(
     const now = new Date();
     const todayDateKey = getTodayDateKey();
 
+    // Auto-mark overdue online appointments as not completed (no-show)
+    await autoMarkNoShowOnlineAppointments();
+
     const todaySelector = buildDateSelector(todayDateKey);
 
     // Compute start of tomorrow to separate today's appointments from upcoming (future dates only)
     const todayStart = normalizeDateOnly(now);
     const startOfTomorrow = todayStart ? new Date(todayStart.getTime() + 24 * 60 * 60 * 1000) : new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    const [pendingAppointments, todayAppointments, upcomingAppointments] = await Promise.all([
+    const [pendingAppointments, todayAppointments, upcomingAppointments, pendingOutcomeAppointments] = await Promise.all([
       Appointment.findAll(
         { where: { status: 'pending', otp: null }, order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']] }
       ),
@@ -304,6 +331,17 @@ router.get(
         order: [['scheduledStart', 'ASC'], ['dateKey', 'ASC'], ['date', 'ASC'], ['time', 'ASC'], ['createdAt', 'ASC']],
         limit: 12,
       }),
+      // Pending outcome: walk-in appointments that are still 'accepted' but past
+      // their scheduled end time. These should NOT auto-mark — the admin can still
+      // manually mark them as completed or not completed so they never disappear.
+      Appointment.findAll({
+        where: {
+          isWalkIn: true,
+          status: 'accepted',
+          scheduledEnd: { [Op.lt]: now },
+        },
+        order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']],
+      }),
     ]);
 
     const stats = {
@@ -335,6 +373,7 @@ router.get(
       pendingAppointments: pendingAppointments.map(serializeAppointment),
       todayAppointments: todayAppointments.map(serializeAppointment),
       upcomingAppointments: upcomingAppointments.map(serializeAppointment),
+      pendingOutcomeAppointments: pendingOutcomeAppointments.map(serializeAppointment),
     });
   })
 );
