@@ -294,11 +294,11 @@ function AdminDashboard() {
                   <p className="text-sm text-police dark:text-slate-400">Jump to key admin tools without losing your place.</p>
                 </div>
                 <div className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-police dark:bg-slate-700 dark:text-slate-300">
-                  5 shortcuts
+                  6 shortcuts
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
                 {QUICK_LINKS.map((item) => {
                   const Icon = item.icon;
                   const badgeValue = item.badgeKey === 'unreadCount' ? unreadCount : 0;
@@ -307,13 +307,10 @@ function AdminDashboard() {
                     <Link
                       key={item.to}
                       to={item.to}
-                      className={`relative flex items-center justify-between rounded-[22px] p-6 transition ${item.tone}`}
+                      className={`relative flex items-center gap-3 rounded-[22px] p-5 transition ${item.tone}`}
                     >
-                      <div>
-                        <p className="text-sm opacity-80">Open</p>
-                        <p className="text-lg font-semibold">{item.label}</p>
-                      </div>
-                      <Icon className="h-6 w-6" />
+                      <Icon className="h-6 w-6 shrink-0" />
+                      <p className="truncate text-base font-semibold">{item.label}</p>
                       {hasBadge && (
                         <span className="absolute right-3 top-3 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white shadow-lg ring-2 ring-white/30">
                           {badgeValue > 9 ? '9+' : badgeValue}
