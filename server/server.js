@@ -124,6 +124,23 @@ const startServer = async () => {
     app.use('/api/admin', adminRoute);
     app.use('/api/public', publicBlockedDatesRoute);
 
+    // ── Purge any leftover fake/demo data on startup ────────────────────────
+    // This removes any [FAKE] records that may have been seeded into the
+    // production database by previous versions of the app. Runs once on
+    // every server start so the deployed DB is always clean.
+    const Appointment = require('./models/Appointment');
+    const { Op } = require('sequelize');
+    try {
+      const purgedFake = await Appointment.destroy({
+        where: { notes: { [Op.like]: '%FAKE%' } },
+      });
+      if (purgedFake > 0) {
+        console.log(`Purged ${purgedFake} fake/demo appointment(s) from database.`);
+      }
+    } catch (purgeError) {
+      console.error('Fake data purge error (non-fatal):', purgeError.message);
+    }
+
     if (database.mode === 'sqlite') {
       console.log(`Connected to SQLite at ${database.uri}`);
     } else if (database.mode === 'postgres') {
@@ -144,9 +161,6 @@ const startServer = async () => {
     // as 'notCompleted'. Walk-ins are intentionally NOT auto-marked — they
     // remain visible in the dashboard's "Pending Outcome" section until the
     // admin manually marks them as completed or not completed.
-    const { Op } = require('sequelize');
-    const Appointment = require('./models/Appointment');
-
     const autoMarkNoShowOnlineAppointments = async () => {
       try {
         const now = new Date();

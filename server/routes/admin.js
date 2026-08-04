@@ -12,7 +12,6 @@ const sendSMS = require('../utils/sendSMS');
 const { getJwtSecret } = require('../utils/jwtSecret');
 
 const { getNextSerialNumber } = require('../utils/serialNumbers');
-const { seedParkDemo } = require('../utils/parkDemoSeed');
 const {
   buildSchedule,
   dateKeyFromDateValue,
@@ -1215,28 +1214,6 @@ router.get(
       statusTimeline,
       serviceTrend,
       walkInVsOnline,
-    });
-  })
-);
-
-// ── Seed Demo Data Endpoint ─────────────────────────────────────────────────
-// Seeds fake "park demo" appointments (Filipino names, PH mobile prefixes,
-// ~90% walk-ins, NO SMS/OTP sent) directly into whatever DB this server is
-// connected to. In production that is the Neon/Postgres database used by
-// Render, so this lets admins populate live analytics without a CLI.
-router.post(
-  '/seed-demo',
-  auth,
-  asyncHandler(async (req, res) => {
-    const requestedTotal = Number(req.body?.total);
-    const result = await seedParkDemo({
-      total: Number.isFinite(requestedTotal) ? requestedTotal : 70,
-      manageConnection: false, // Server already holds the DB connection.
-    });
-
-    res.json({
-      message: 'Demo data seeded successfully.',
-      seeded: result,
     });
   })
 );
