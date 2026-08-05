@@ -576,6 +576,8 @@ router.patch(
     }
     await appointment.save();
 
+    // SMS is only sent for OTP verification, accepted, and rejected statuses.
+    // Completed / not completed statuses do NOT send SMS to avoid wasting credits.
     const statusSmsBuilders = {
       accepted: (entry) => {
         const name = formatName(entry);
@@ -587,9 +589,6 @@ router.patch(
         const reason = entry.rejectionReason ? ` Reason: ${entry.rejectionReason}` : '';
         return `Your appointment on ${entry.dateKey} at ${formatTimeLabel(entry.time)} was rejected.${reason}`;
       },
-      completed: () => 'Your appointment has been marked as completed. Thank you.',
-      notCompleted: () =>
-        'Your appointment has been marked as not completed. Please contact the clinic if needed.',
     };
 
     const builder = statusSmsBuilders[status];
