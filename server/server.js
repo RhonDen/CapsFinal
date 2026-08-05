@@ -124,11 +124,30 @@ const startServer = async () => {
     app.use('/api/admin', adminRoute);
     app.use('/api/public', publicBlockedDatesRoute);
 
-    // No fake data seeding or purging happens here. Existing past appointments
-    // (including any previously seeded demo records) are left untouched.
-    // No new fake/demo appointments will be auto-generated going forward.
+    // ── Purge leftover fake/demo data on startup ────────────────────────────
+    // This removes ONLY the fake seeded records (marked with [FAKE] notes or
+    // @example.com emails or "Park demo" notes). Real patient appointments and
+    // real history are NEVER touched — they do not carry these markers.
+    // Runs once on every server start so the deployed DB stays clean of the
+    // demo data that was auto-seeded by previous versions of this app.
     const Appointment = require('./models/Appointment');
     const { Op } = require('sequelize');
+    try {
+      const purgedFake = await Appointment.destroy({
+        where: {
+          [Op.or]: [
+            { notes: { [Op.like]: '[FAKE]%' } },
+            { email: { [Op.like]: '%@example.com' } },
+            { notes: { [Op.like]: '%Park demo%' } },
+          ],
+        },
+      });
+      if (purgedFake > 0) {
+        console.log(`Purged ${purgedFake} fake/demo appointment(s) from history. Real appointments untouched.`);
+      }
+    } catch (purgeError) {
+      console.error('Fake data purge error (non-fatal):', purgeError.message);
+    }
 
     if (database.mode === 'sqlite') {
       console.log(`Connected to SQLite at ${database.uri}`);
