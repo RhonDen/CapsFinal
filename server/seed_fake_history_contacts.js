@@ -121,10 +121,22 @@ async function main() {
   });
   console.log(`Purged ${purgedContacts} previous fake contact message(s).`);
 
-  // ── 2. Seed fake HISTORY appointments ────────────────────────────────────
+// ── 2. Seed fake HISTORY appointments ────────────────────────────────────
   const total = Math.min(75, Math.max(30, Number(process.env.SEED_FAKE_HISTORY_TOTAL || 60)));
   const today = new Date();
-  const { start: windowStart, end: windowEnd } = lastDaysWindow(270, today);
+
+  // Fake history is intentionally limited to MAY of the current year only.
+  // Build a May 1 – May 31 window, but cap the end at YESTERDAY (23:59:59.999)
+  // so no fake record ever lands on today or a future date. This guarantees
+  // fake appointments never appear in the Dashboard's "Upcoming appointments"
+  // / "Pending requests" / "Pending outcome" popups.
+  const currentYear = today.getFullYear();
+  const windowStart = new Date(currentYear, 4, 1, 0, 0, 0, 0); // May 1 (month index 4)
+  const mayEnd = new Date(currentYear, 4, 31, 23, 59, 59, 999); // May 31
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(23, 59, 59, 999);
+  const windowEnd = mayEnd > yesterday ? yesterday : mayEnd;
 
   // Only FINALIZED statuses — no 'pending' or 'accepted' so these never
   // appear in Pending requests / Pending Outcome popups.
