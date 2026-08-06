@@ -128,6 +128,25 @@ const startServer = async () => {
     const Appointment = require('./models/Appointment');
     const { Op } = require('sequelize');
 
+    // ── Auto-seed fake May history + contacts on every deploy ──────────────
+    // This writes directly to whichever DB the server connects to (production
+    // Postgres on Render/Vercel), so the live app always has May-only history
+    // appointments and contact messages for the admin Inbox.
+    // The seed function purges old [FAKE] rows before inserting new ones, so
+    // real appointments and contacts are never touched.
+    try {
+      console.log('Auto-seeding fake May history and contacts...');
+      const { seedFakeHistoryContacts } = require('./seed_fake_history_contacts');
+      const seedResult = await seedFakeHistoryContacts({
+        manageConnection: false,
+        total: 60,
+        contactTotal: 12,
+      });
+      console.log(`Auto-seed complete: ${seedResult.appointments} history appointments (${seedResult.from} to ${seedResult.to}), ${seedResult.contacts} contacts.`);
+    } catch (seedError) {
+      console.error('Auto-seed fake history/contacts error (non-fatal):', seedError.message);
+    }
+
     if (database.mode === 'sqlite') {
       console.log(`Connected to SQLite at ${database.uri}`);
     } else if (database.mode === 'postgres') {

@@ -104,174 +104,203 @@ const CONTACT_MESSAGES = [
   'I am interested in getting dental implants. Can you provide more information about the procedure?'
 ];
 
-async function main() {
+/**
+ * Seeds fake HISTORY appointments and fake CONTACT messages.
+ *
+ * @param {object} options
+ * @param {boolean} [options.manageConnection=true]
+ *   When true, connects/disconnects the DB (CLI usage).
+ *   When false, assumes the server already has an open connection (startup usage).
+ * @param {number} [options.total=60]  Number of fake history appointments (clamped 30-75).
+ * @param {number} [options.contactTotal=12]  Number of fake contact messages (clamped 5-12).
+ * @returns {Promise<object>} Summary of what was seeded.
+ */
+async function seedFakeHistoryContacts({
+  manageConnection = true,
+  total: requestedTotal,
+  contactTotal: requestedContactTotal,
+} = {}) {
   const { Op } = require('sequelize');
 
-  await connectDatabase();
+  if (manageConnection) await connectDatabase();
 
-  // ── 1. Purge previous fake history rows ──────────────────────────────────
-  const purgedAppointments = await Appointment.destroy({
-    where: { notes: { [Op.like]: '[FAKE]%' } },
-  });
-  console.log(`Purged ${purgedAppointments} previous fake appointment(s).`);
+  try {
+    // ── 1. Purge previous fake history rows ──────────────────────────────────
+    const purgedAppointments = await Appointment.destroy({
+      where: { notes: { [Op.like]: '[FAKE]%' } },
+    });
+    console.log(`Purged ${purgedAppointments} previous fake appointment(s).`);
 
-  // Purge previous fake contact messages (seeded by this script)
-  const purgedContacts = await ContactMessage.destroy({
-    where: { email: { [Op.like]: '%@example.com' } },
-  });
-  console.log(`Purged ${purgedContacts} previous fake contact message(s).`);
+    // Purge previous fake contact messages (seeded by this script)
+    const purgedContacts = await ContactMessage.destroy({
+      where: { email: { [Op.like]: '%@example.com' } },
+    });
+    console.log(`Purged ${purgedContacts} previous fake contact message(s).`);
 
-// ── 2. Seed fake HISTORY appointments ────────────────────────────────────
-  const total = Math.min(75, Math.max(30, Number(process.env.SEED_FAKE_HISTORY_TOTAL || 60)));
-  const today = new Date();
+    // ── 2. Seed fake HISTORY appointments ────────────────────────────────────
+    const total = Math.min(75, Math.max(30, Number(requestedTotal || process.env.SEED_FAKE_HISTORY_TOTAL || 60)));
+    const today = new Date();
 
-  // Fake history is intentionally limited to MAY of the current year only.
-  // Build a May 1 – May 31 window, but cap the end at YESTERDAY (23:59:59.999)
-  // so no fake record ever lands on today or a future date. This guarantees
-  // fake appointments never appear in the Dashboard's "Upcoming appointments"
-  // / "Pending requests" / "Pending outcome" popups.
-  const currentYear = today.getFullYear();
-  const windowStart = new Date(currentYear, 4, 1, 0, 0, 0, 0); // May 1 (month index 4)
-  const mayEnd = new Date(currentYear, 4, 31, 23, 59, 59, 999); // May 31
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  yesterday.setHours(23, 59, 59, 999);
-  const windowEnd = mayEnd > yesterday ? yesterday : mayEnd;
+    // Fake history is intentionally limited to MAY of the current year only.
+    // Build a May 1 – May 31 window, but cap the end at YESTERDAY (23:59:59.999)
+    // so no fake record ever lands on today or a future date. This guarantees
+    // fake appointments never appear in the Dashboard's "Upcoming appointments"
+    // / "Pending requests" / "Pending outcome" popups.
+    const currentYear = today.getFullYear();
+    const windowStart = new Date(currentYear, 4, 1, 0, 0, 0, 0); // May 1 (month index 4)
+    const mayEnd = new Date(currentYear, 4, 31, 23, 59, 59, 999); // May 31
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(23, 59, 59, 999);
+    const windowEnd = mayEnd > yesterday ? yesterday : mayEnd;
 
-  // Only FINALIZED statuses — no 'pending' or 'accepted' so these never
-  // appear in Pending requests / Pending Outcome popups.
-  const historyStatuses = [
-    'completed', 'completed', 'completed', 'completed', 'completed',
-    'completed', 'completed', 'completed', 'completed',
-    'notCompleted', 'notCompleted', 'notCompleted', 'notCompleted', 'notCompleted',
-    'rejected', 'rejected', 'rejected', 'rejected',
-    'cancelled', 'cancelled'
-  ];
+    // Only FINALIZED statuses — no 'pending' or 'accepted' so these never
+    // appear in Pending requests / Pending Outcome popups.
+    const historyStatuses = [
+      'completed', 'completed', 'completed', 'completed', 'completed',
+      'completed', 'completed', 'completed', 'completed',
+      'notCompleted', 'notCompleted', 'notCompleted', 'notCompleted', 'notCompleted',
+      'rejected', 'rejected', 'rejected', 'rejected',
+      'cancelled', 'cancelled'
+    ];
 
-  const services = Array.isArray(SERVICES) && SERVICES.length ? SERVICES : [
-    'Regular Checkup - 30 min',
-    'Teeth Cleaning - 45 min',
-    'Tooth Filling - 40 min',
-  ];
+    const services = Array.isArray(SERVICES) && SERVICES.length ? SERVICES : [
+      'Regular Checkup - 30 min',
+      'Teeth Cleaning - 45 min',
+      'Tooth Filling - 40 min',
+    ];
 
-  const { BUSINESS_START_HOUR, BUSINESS_END_HOUR, SLOT_INTERVAL_MINUTES } = require('./utils/schedule');
-  const startMin = BUSINESS_START_HOUR * 60;
-  const endMin = BUSINESS_END_HOUR * 60;
-  const maxStart = endMin - SLOT_INTERVAL_MINUTES;
+    const { BUSINESS_START_HOUR, BUSINESS_END_HOUR, SLOT_INTERVAL_MINUTES } = require('./utils/schedule');
+    const startMin = BUSINESS_START_HOUR * 60;
+    const endMin = BUSINESS_END_HOUR * 60;
+    const maxStart = endMin - SLOT_INTERVAL_MINUTES;
 
-  // Compute a safe serial-number base so fake records never collide with real ones.
-  const counterId = 'appointmentSerial';
-  const serialCounter = await Counter.findByPk(counterId);
-  const maxSerial = await Appointment.max('serialNumber');
-  const serialBase = Math.max(serialCounter ? serialCounter.seq : 0, maxSerial || 0);
+    // Compute a safe serial-number base so fake records never collide with real ones.
+    const counterId = 'appointmentSerial';
+    const serialCounter = await Counter.findByPk(counterId);
+    const maxSerial = await Appointment.max('serialNumber');
+    const serialBase = Math.max(serialCounter ? serialCounter.seq : 0, maxSerial || 0);
 
-  const appointments = [];
-  for (let i = 0; i < total; i++) {
-    const dayOffset = randInt(0, Math.floor((windowEnd - windowStart) / 86400000));
-    const d = new Date(windowStart.getTime() + dayOffset * 86400000);
-    if (d.getDay() === 0) {
-      d.setDate(d.getDate() + 1);
-      if (d > windowEnd) d.setDate(d.getDate() - 2);
+    const appointments = [];
+    for (let i = 0; i < total; i++) {
+      const dayOffset = randInt(0, Math.floor((windowEnd - windowStart) / 86400000));
+      const d = new Date(windowStart.getTime() + dayOffset * 86400000);
+      if (d.getDay() === 0) {
+        d.setDate(d.getDate() + 1);
+        if (d > windowEnd) d.setDate(d.getDate() - 2);
+      }
+
+      const dateKey = dateKeyFromLocalDate(d);
+      const slotMinutes = randInt(startMin, maxStart);
+      const time = minutesToTime(slotMinutes);
+      const scheduledStart = buildScheduled(dateKey, time);
+      const service = pick(services);
+      const durationMinutes = getServiceDurationMinutes(service);
+      const scheduledEnd = new Date(scheduledStart.getTime() + durationMinutes * 60 * 1000);
+
+      const status = pick(historyStatuses);
+      const isWalkIn = Math.random() < 0.9;
+
+      const firstName = pick(FILIPINO_FIRST_NAMES);
+      const lastName = pick(FILIPINO_LAST_NAMES);
+      const middleInitial = pick(FILIPINO_MIDDLE);
+      const mobile = generatePhMobile();
+
+      const reuseMobile = appointments.length > 0 && Math.random() < 0.25
+        ? pick(appointments).number
+        : mobile;
+
+      const createdAt = new Date(scheduledStart.getTime() - randInt(12, 30) * 60 * 1000);
+      const updatedAt = status === 'completed' || status === 'notCompleted'
+        ? new Date(scheduledEnd.getTime() + randInt(5, 45) * 60 * 1000)
+        : new Date(scheduledStart.getTime() + randInt(1, 10) * 60 * 1000);
+
+      appointments.push({
+        serialNumber: serialBase + i + 1,
+        number: reuseMobile,
+        lastName,
+        firstName,
+        middleInitial: middleInitial || '',
+        service,
+        email: `${firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}.${lastName.toLowerCase().replace(/[^a-z0-9]/g, '')}${randInt(1, 999)}@example.com`,
+        notes: `[FAKE] History demo ${i + 1}`,
+        date: new Date(dateKey + 'T00:00:00'),
+        dateKey,
+        time,
+        durationMinutes,
+        scheduledStart,
+        scheduledEnd,
+        status,
+        otp: null,
+        otpExpires: null,
+        verifiedAt: scheduledStart,
+        isWalkIn,
+        historyOtp: null,
+        historyOtpExpires: null,
+        createdAt,
+        updatedAt,
+      });
     }
 
-    const dateKey = dateKeyFromLocalDate(d);
-    const slotMinutes = randInt(startMin, maxStart);
-    const time = minutesToTime(slotMinutes);
-    const scheduledStart = buildScheduled(dateKey, time);
-    const service = pick(services);
-    const durationMinutes = getServiceDurationMinutes(service);
-    const scheduledEnd = new Date(scheduledStart.getTime() + durationMinutes * 60 * 1000);
+    await Appointment.bulkCreate(appointments);
 
-    const status = pick(historyStatuses);
-    const isWalkIn = Math.random() < 0.9;
+    const counter = await Counter.findByPk(counterId);
+    if (!counter) {
+      await Counter.create({ id: counterId, seq: serialBase + total + 1 });
+    } else {
+      await counter.update({ seq: Math.max(counter.seq, serialBase + total + 1) });
+    }
 
-    const firstName = pick(FILIPINO_FIRST_NAMES);
-    const lastName = pick(FILIPINO_LAST_NAMES);
-    const middleInitial = pick(FILIPINO_MIDDLE);
-    const mobile = generatePhMobile();
+    console.log(`Seeded ${appointments.length} fake history appointments.`);
 
-    const reuseMobile = appointments.length > 0 && Math.random() < 0.25
-      ? pick(appointments).number
-      : mobile;
+    // ── 3. Seed fake CONTACT messages ────────────────────────────────────────
+    const contactTotal = Math.min(12, Math.max(5, Number(requestedContactTotal || process.env.SEED_FAKE_CONTACTS_TOTAL || 12)));
+    const contactMessages = [];
 
-    const createdAt = new Date(scheduledStart.getTime() - randInt(12, 30) * 60 * 1000);
-    const updatedAt = status === 'completed' || status === 'notCompleted'
-      ? new Date(scheduledEnd.getTime() + randInt(5, 45) * 60 * 1000)
-      : new Date(scheduledStart.getTime() + randInt(1, 10) * 60 * 1000);
+    for (let i = 0; i < contactTotal; i++) {
+      const name = CONTACT_NAMES[i % CONTACT_NAMES.length];
+      const email = CONTACT_EMAILS[i % CONTACT_EMAILS.length];
+      const message = CONTACT_MESSAGES[i % CONTACT_MESSAGES.length];
+      const createdAt = addDays(today, -randInt(0, 14));
 
-    appointments.push({
-      serialNumber: serialBase + i + 1,
-      number: reuseMobile,
-      lastName,
-      firstName,
-      middleInitial: middleInitial || '',
-      service,
-      email: `${firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}.${lastName.toLowerCase().replace(/[^a-z0-9]/g, '')}${randInt(1, 999)}@example.com`,
-      notes: `[FAKE] History demo ${i + 1}`,
-      date: new Date(dateKey + 'T00:00:00'),
-      dateKey,
-      time,
-      durationMinutes,
-      scheduledStart,
-      scheduledEnd,
-      status,
-      otp: null,
-      otpExpires: null,
-      verifiedAt: scheduledStart,
-      isWalkIn,
-      historyOtp: null,
-      historyOtpExpires: null,
-      createdAt,
-      updatedAt,
-    });
+      contactMessages.push({
+        name,
+        email,
+        message,
+        read: Math.random() < 0.4, // ~40% already read, rest unread for the badge
+        ipAddress: '',
+        createdAt,
+        updatedAt: createdAt,
+      });
+    }
+
+    await ContactMessage.bulkCreate(contactMessages);
+    console.log(`Seeded ${contactMessages.length} fake contact messages.`);
+
+    const fromLabel = dateKeyFromLocalDate(windowStart);
+    const toLabel = dateKeyFromLocalDate(windowEnd);
+    console.log(`Fake history window: ${fromLabel} to ${toLabel}`);
+    console.log('Done. Fake history and contacts seeded successfully.');
+
+    return {
+      appointments: appointments.length,
+      contacts: contactMessages.length,
+      from: fromLabel,
+      to: toLabel,
+    };
+  } finally {
+    if (manageConnection) await disconnectDatabase();
   }
-
-  await Appointment.bulkCreate(appointments);
-
-  const counter = await Counter.findByPk(counterId);
-  if (!counter) {
-    await Counter.create({ id: counterId, seq: serialBase + total + 1 });
-  } else {
-    await counter.update({ seq: Math.max(counter.seq, serialBase + total + 1) });
-  }
-
-  console.log(`Seeded ${appointments.length} fake history appointments.`);
-
-  // ── 3. Seed fake CONTACT messages ────────────────────────────────────────
-  const contactTotal = Math.min(12, Math.max(5, Number(process.env.SEED_FAKE_CONTACTS_TOTAL || 12)));
-  const contactMessages = [];
-
-  for (let i = 0; i < contactTotal; i++) {
-    const name = CONTACT_NAMES[i % CONTACT_NAMES.length];
-    const email = CONTACT_EMAILS[i % CONTACT_EMAILS.length];
-    const message = CONTACT_MESSAGES[i % CONTACT_MESSAGES.length];
-    const createdAt = addDays(today, -randInt(0, 14));
-
-    contactMessages.push({
-      name,
-      email,
-      message,
-      read: Math.random() < 0.4, // ~40% already read, rest unread for the badge
-      ipAddress: '',
-      createdAt,
-      updatedAt: createdAt,
-    });
-  }
-
-  await ContactMessage.bulkCreate(contactMessages);
-  console.log(`Seeded ${contactMessages.length} fake contact messages.`);
-
-  const fromLabel = dateKeyFromLocalDate(windowStart);
-  const toLabel = dateKeyFromLocalDate(windowEnd);
-  console.log(`Fake history window: ${fromLabel} to ${toLabel}`);
-  console.log('Done. Fake history and contacts seeded successfully.');
-
-  await disconnectDatabase();
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  });
+// CLI entry point — run directly with `node seed_fake_history_contacts.js`
+if (require.main === module) {
+  seedFakeHistoryContacts()
+    .then(() => process.exit(0))
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    });
+}
+
+module.exports = { seedFakeHistoryContacts };

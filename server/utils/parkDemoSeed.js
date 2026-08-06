@@ -161,14 +161,14 @@ async function seedParkDemo({ total = 70, manageConnection = true } = {}) {
     logger.log(`Park demo: seeding ${parkTotal} appointments from ${fromLabel} to ${toLabel}`);
 
     // Weighted statuses (heavy on completed / notCompleted / rejected).
-    // NOTE: no 'pending' — pending rows appear as "Pending requests" popups
-    // on the Dashboard and would require admin action. Only finalized statuses.
+    // NOTE: no 'pending' or 'accepted' — those rows appear as "Pending requests"
+    // / "Pending Outcome" popups on the Dashboard and would require admin action.
+    // Only finalized statuses (completed / notCompleted / rejected) are used.
     const parkStatuses = [
       'completed','completed','completed','completed','completed',
       'completed','completed','completed','completed',
       'notCompleted','notCompleted','notCompleted','notCompleted','notCompleted',
-      'rejected','rejected','rejected','rejected',
-      'accepted','accepted'
+      'rejected','rejected','rejected','rejected'
     ];
 
     const services = Array.isArray(SERVICES) && SERVICES.length ? SERVICES : [
