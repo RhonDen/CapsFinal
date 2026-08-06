@@ -108,6 +108,7 @@ function AdminDashboard() {
 
   useEffect(() => {
     let intervalId = null;
+    let keepAliveId = null;
     let isActive = true;
 
     const fetchDashboard = async (showLoader = false) => {
@@ -129,10 +130,32 @@ function AdminDashboard() {
           apiError?.toLowerCase?.().includes('no token');
 
         if (isAuthError) {
-          setError('');
-          setLoading(false);
-          if (intervalId) clearInterval(intervalId);
-          window.location.href = '/admin/login';
+          // Don't immediately log the admin out on a single 401 during
+          // background polling. The server may be waking up from sleep or
+          // restarting (e.g., free-tier hosting). Retry a few times before
+          // redirecting, so transient issues don't kill the session.
+          let retries = 0;
+          const maxRetries = 3;
+          const retry = async () => {
+            if (!isActive) return;
+            retries += 1;
+            try {
+              const response = await api.get('/api/admin/dashboard');
+              setDashboard(response.data);
+              setError('');
+            } catch (retryError) {
+              if (retries < maxRetries) {
+                setTimeout(retry, 2000);
+              } else {
+                setError('');
+                setLoading(false);
+                if (intervalId) clearInterval(intervalId);
+                if (keepAliveId) clearInterval(keepAliveId);
+                window.location.href = '/admin/login';
+              }
+            }
+          };
+          retry();
           return;
         }
 
@@ -151,9 +174,28 @@ function AdminDashboard() {
       fetchDashboard(false);
     }, 15000);
 
+    // When the admin returns to the tab after being AFK, immediately
+    // refetch the dashboard so it's never stale. This also prevents the
+    // page from appearing to "refresh"/lose state when coming back.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchDashboard(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Keep-alive: ping the server periodically so it doesn't go to sleep
+    // (e.g., free-tier hosting that sleeps after inactivity). This keeps
+    // the session alive and prevents the "idle logs out" issue.
+    keepAliveId = setInterval(() => {
+      api.get('/api/health').catch(() => {});
+    }, 30000);
+
     return () => {
       isActive = false;
       if (intervalId) clearInterval(intervalId);
+      if (keepAliveId) clearInterval(keepAliveId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 

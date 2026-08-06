@@ -333,11 +333,16 @@ router.get(
       // Pending outcome: walk-in appointments that are still 'accepted' but past
       // their scheduled end time. These should NOT auto-mark — the admin can still
       // manually mark them as completed or not completed so they never disappear.
+      // Also include walk-ins with a null scheduledEnd (e.g. schedule builder
+      // failed for an out-of-hours time) so they never vanish from the dashboard.
       Appointment.findAll({
         where: {
           isWalkIn: true,
           status: 'accepted',
-          scheduledEnd: { [Op.lt]: now },
+          [Op.or]: [
+            { scheduledEnd: { [Op.lt]: now } },
+            { scheduledEnd: null },
+          ],
         },
         order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']],
       }),
