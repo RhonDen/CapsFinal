@@ -23,6 +23,9 @@ app.use(helmet());
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
   .map(s => s.trim());
+// Also allow the backend's own origin (port 5000) so the built SPA served
+// by Express can authenticate without CORS failures.
+allowedOrigins.push('http://localhost:5000');
 app.use(
   cors({
     origin: function (origin, callback) {

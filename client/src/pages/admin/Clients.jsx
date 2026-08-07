@@ -48,8 +48,9 @@ function Clients() {
     fetchClients();
   }, []);
 
-  // Searchable by name or phone digits. Uses word-boundary matching for names
-  // and exact last-10-digit matching for phone numbers to avoid unrelated results.
+  // Searchable by name or phone digits. Names use word-boundary matching;
+  // phone numbers use partial digit matching so searching a number shows
+  // every person sharing that number (even with different names).
   const filteredClients = useMemo(() => {
     let result = clients;
     const nameQuery = searchQuery.trim().toLowerCase();
@@ -74,10 +75,12 @@ function Clients() {
       });
     }
     if (phoneQuery) {
-      // Match the last 10 digits of the stored phone number exactly.
+      // Partial digit matching: any client whose number contains the
+      // searched digits (last 10 digits) is included. This surfaces all
+      // people sharing the same number, each with their own name.
       result = result.filter((client) => {
         const digits = String(client.number || '').replace(/\D/g, '');
-        return digits.slice(-10) === phoneQuery.slice(-10);
+        return digits.slice(-10).includes(phoneQuery.slice(-10));
       });
     }
     return result;

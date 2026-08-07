@@ -210,6 +210,7 @@ function DataAnalysis() {
     statusTimeline: [],
     serviceTrend: [],
     walkInVsOnline: null,
+    logisticRegression: null,
   });
 
   const [selectedPredictiveService, setSelectedPredictiveService] = useState('');
@@ -310,6 +311,7 @@ function DataAnalysis() {
           statusTimeline: response.data.statusTimeline || [],
           serviceTrend: response.data.serviceTrend || [],
           walkInVsOnline: response.data.walkInVsOnline || null,
+          logisticRegression: response.data.logisticRegression || null,
         });
 
         if (analysisType === 'predictive') {
@@ -485,6 +487,234 @@ function DataAnalysis() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* ── LOGISTIC REGRESSION — COMPLETION PROBABILITY ── */}
+          {data.logisticRegression && (
+            <div className="mt-8">
+              <div className="mb-3 flex items-center gap-2">
+                <h2 className="text-xl font-bold text-maastricht dark:text-slate-100">
+                  Logistic Regression — Completion Probability
+                </h2>
+                <Info
+                  className="h-4 w-4 text-silver-lake"
+                  title="Model predicts the probability of completion per appointment, not a hard class label"
+                />
+              </div>
+              <p className="mb-4 text-sm text-police dark:text-slate-300">
+                A logistic regression model trained on finalized appointments estimates the
+                probability (0–100%) that an appointment is completed. It outputs a continuous
+                risk/confidence score — not a binary “will happen / won’t happen” label.
+              </p>
+
+              {data.logisticRegression.trained ? (
+                <>
+                  {/* Overall probability */}
+                  {(data.logisticRegression.overallProbability !== undefined ||
+                    data.logisticRegression.sampleSize) && (
+                    <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <p className="text-sm font-medium text-police dark:text-slate-300">Overall completion probability</p>
+                        <p className="mt-2 text-4xl font-bold text-green-600">
+                          {Math.round((data.logisticRegression.overallProbability || 0) * 100)}%
+                        </p>
+                        <p className="mt-1 text-sm text-police dark:text-slate-300">
+                          Modeled across all finalized appointments
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <p className="text-sm font-medium text-police dark:text-slate-300">At-risk (not completed)</p>
+                        <p className="mt-2 text-4xl font-bold text-amber-600">
+                          {Math.round((1 - (data.logisticRegression.overallProbability || 0)) * 100)}%
+                        </p>
+                        <p className="mt-1 text-sm text-police dark:text-slate-300">
+                          Estimated no-show / non-completion rate
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <p className="text-sm font-medium text-police dark:text-slate-300">Training samples</p>
+                        <p className="mt-2 text-4xl font-bold text-maastricht dark:text-slate-100">
+                          {data.logisticRegression.sampleSize || 0}
+                        </p>
+                        <p className="mt-1 text-sm text-police dark:text-slate-300">
+                          finalized appointments used to fit the model
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    {/* Per-service probabilities */}
+                    {data.logisticRegression.serviceProbabilities &&
+                      data.logisticRegression.serviceProbabilities.length > 0 && (
+                      <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+                        <h3 className="mb-3 text-lg font-semibold text-maastricht dark:text-slate-100">
+                          Completion probability by service
+                        </h3>
+                        <div className="space-y-3">
+                          {data.logisticRegression.serviceProbabilities.map((item, idx) => {
+                            const pct = Math.round((item.probability || 0) * 100);
+                            return (
+                              <div key={`${item.service}-${idx}`}>
+                                <div className="mb-1 flex items-center justify-between text-sm">
+                                  <span className="truncate font-medium text-maastricht dark:text-slate-200">
+                                    {item.service}
+                                  </span>
+                                  <span className="ml-2 shrink-0 font-semibold text-maastricht dark:text-slate-100">
+                                    {pct}%
+                                  </span>
+                                </div>
+                                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${pct}%`,
+                                      backgroundColor: pct >= 70 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#EF4444',
+                                    }}
+                                  />
+                                </div>
+                                <p className="mt-0.5 text-xs text-police dark:text-slate-400">
+                                  {item.completed} of {item.total} completed
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Per-day probabilities */}
+                    {data.logisticRegression.dowProbabilities &&
+                      data.logisticRegression.dowProbabilities.length > 0 && (
+                      <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+                        <h3 className="mb-3 text-lg font-semibold text-maastricht dark:text-slate-100">
+                          Completion probability by day of week
+                        </h3>
+                        <div className="space-y-3">
+                          {data.logisticRegression.dowProbabilities.map((item, idx) => {
+                            const pct = Math.round((item.probability || 0) * 100);
+                            return (
+                              <div key={`${item.day}-${idx}`}>
+                                <div className="mb-1 flex items-center justify-between text-sm">
+                                  <span className="font-medium text-maastricht dark:text-slate-200">
+                                    {item.day}
+                                  </span>
+                                  <span className="ml-2 shrink-0 font-semibold text-maastricht dark:text-slate-100">
+                                    {pct}%
+                                  </span>
+                                </div>
+                                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${pct}%`,
+                                      backgroundColor: pct >= 70 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#EF4444',
+                                    }}
+                                  />
+                                </div>
+                                <p className="mt-0.5 text-xs text-police dark:text-slate-400">
+                                  {item.completed} of {item.total} completed
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Feature importance */}
+                    {data.logisticRegression.featureImportance &&
+                      data.logisticRegression.featureImportance.length > 0 && (
+                      <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+                        <h3 className="mb-3 text-lg font-semibold text-maastricht dark:text-slate-100">
+                          What drives completion?
+                        </h3>
+                        <p className="mb-3 text-sm text-police dark:text-slate-300">
+                          Model coefficients (standardized) — larger magnitude = stronger influence.
+                        </p>
+                        <div className="max-h-[320px] space-y-2 overflow-y-auto">
+                          {data.logisticRegression.featureImportance.map((item, idx) => {
+                            const mag = Math.abs(item.coefficient || 0);
+                            const positive = (item.coefficient || 0) >= 0;
+                            const maxMag = Math.max(
+                              0.0001,
+                              ...data.logisticRegression.featureImportance.map(
+                                (f) => Math.abs(f.coefficient || 0)
+                              )
+                            );
+                            return (
+                              <div key={`${item.feature}-${idx}`} className="text-sm">
+                                <div className="mb-1 flex items-center justify-between">
+                                  <span className="truncate font-medium text-maastricht dark:text-slate-200">
+                                    {item.feature}
+                                  </span>
+                                  <span
+                                    className={`ml-2 shrink-0 font-semibold ${
+                                      positive ? 'text-green-600' : 'text-red-600'
+                                    }`}
+                                  >
+                                    {positive ? '+' : ''}
+                                    {item.coefficient.toFixed(3)}
+                                  </span>
+                                </div>
+                                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${(mag / maxMag) * 100}%`,
+                                      backgroundColor: positive ? '#10B981' : '#EF4444',
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Model metrics */}
+                    {data.logisticRegression.metrics && (
+                      <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+                        <h3 className="mb-3 text-lg font-semibold text-maastricht dark:text-slate-100">
+                          Model performance
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          {[
+                            { label: 'Accuracy', value: data.logisticRegression.metrics.accuracy },
+                            { label: 'Precision', value: data.logisticRegression.metrics.precision },
+                            { label: 'Recall', value: data.logisticRegression.metrics.recall },
+                            { label: 'F1 Score', value: data.logisticRegression.metrics.f1 },
+                            { label: 'AUC', value: data.logisticRegression.metrics.auc },
+                          ].map((m) => (
+                            <div
+                              key={m.label}
+                              className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/30"
+                            >
+                              <p className="text-xs font-medium uppercase tracking-wide text-police dark:text-slate-400">
+                                {m.label}
+                              </p>
+                              <p className="mt-1 text-2xl font-bold text-maastricht dark:text-slate-100">
+                                {Math.round((m.value || 0) * 100)}%
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-4 text-xs text-police dark:text-slate-400">
+                          Metrics computed on the training set (in-sample). Values are
+                          indicative of model fit, not out-of-sample generalization.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-police dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+                  {data.logisticRegression.reason ||
+                    'Not enough data to train a reliable logistic regression model yet.'}
+                </div>
+              )}
             </div>
           )}
 

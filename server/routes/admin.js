@@ -12,6 +12,7 @@ const sendSMS = require('../utils/sendSMS');
 const { getJwtSecret } = require('../utils/jwtSecret');
 
 const { getNextSerialNumber } = require('../utils/serialNumbers');
+const { trainLogisticRegression } = require('../utils/logisticRegression');
 const {
   buildSchedule,
   dateKeyFromDateValue,
@@ -702,8 +703,10 @@ router.delete('/block-dates/:id', auth, asyncHandler(async (req, res) => {
   res.json({ message: 'Removed.' });
 }));
 
-// FLAT clients list: one row per appointment, no phone-number grouping.
-// This lets admins see every patient visit (even with the same number).
+// FLAT clients list: one row per unique person (phone number + name).
+// This lets admins see every patient individually — including multiple
+// people who share the same phone number. Searching a number now shows
+// all the different names tied to it, and names are searchable too.
 router.get(
   '/clients',
   auth,
@@ -714,46 +717,34 @@ router.get(
       order: [['scheduledStart', 'DESC'], ['id', 'DESC']]
     });
 
-    // Group by phone number to avoid duplicate client rows.
-    // Each client appears once with their most recent appointment,
-    // consolidated names, and a total appointment count.
-    const clientMap = new Map();
+    // Dedupe by (number + normalized name) so each unique person appears once.
+    // Different people sharing the same number each get their own row.
+    const seen = new Set();
+    const clients = [];
+
     for (const a of allAppts) {
       const number = a.number || '';
       const displayName = [a.firstName, a.lastName].filter(Boolean).join(' ') || 'Unknown';
-      const apptDate = a.scheduledStart || a.date || a.createdAt;
+      const personKey = number + '|' + displayName.trim().toLowerCase();
 
-      if (!clientMap.has(number)) {
-        clientMap.set(number, {
-          id: a.id,
-          number,
-          fullName: displayName,
-          allNames: [displayName],
-          lastAppointment: apptDate,
-          appointmentCount: 1,
-          service: a.service || '',
-          status: a.status || '',
-          dateKey: a.dateKey || null,
-          createdAt: a.createdAt,
-        });
-      } else {
-        const existing = clientMap.get(number);
-        existing.appointmentCount += 1;
-        // Keep the most recent appointment.
-        if (new Date(apptDate) > new Date(existing.lastAppointment)) {
-          existing.lastAppointment = apptDate;
-          existing.fullName = displayName;
-          existing.service = a.service || '';
-          existing.status = a.status || '';
-        }
-        // Collect all names for this client.
-        if (!existing.allNames.includes(displayName)) {
-          existing.allNames.push(displayName);
-        }
-      }
+      if (seen.has(personKey)) continue;
+      seen.add(personKey);
+
+      clients.push({
+        id: a.id,
+        number,
+        fullName: displayName,
+        allNames: [displayName],
+        lastAppointment: a.scheduledStart || a.date || a.createdAt,
+        appointmentCount: 1,
+        service: a.service || '',
+        status: a.status || '',
+        dateKey: a.dateKey || null,
+        createdAt: a.createdAt,
+      });
     }
 
-    res.json(Array.from(clientMap.values()));
+    res.json(clients);
   })
 );
 
@@ -1227,6 +1218,13 @@ router.get(
       };
     }
 
+    // â”€â”€ 11. LOGISTIC REGRESSION (Probability of completion) â”€â”€
+    // Trains a logistic regression model on all finalized (non-pending)
+    // appointments to estimate the PROBABILITY of completion (0–1), not a
+    // hard class label. Returns per-service probabilities, per-day-of-week
+    // probabilities, feature importance, and model metrics.
+    const logisticRegression = trainLogisticRegression(rows);
+
     res.json({
       descriptive: { pie, line, bar, peakHours },
       diagnostic: { dayOfWeekBreakdown, serviceDowCorrelation },
@@ -1237,6 +1235,7 @@ router.get(
       statusTimeline,
       serviceTrend,
       walkInVsOnline,
+      logisticRegression,
     });
   })
 );
