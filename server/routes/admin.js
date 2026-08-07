@@ -724,7 +724,9 @@ router.get(
 
     for (const a of allAppts) {
       const number = a.number || '';
-      const displayName = [a.firstName, a.lastName].filter(Boolean).join(' ') || 'Unknown';
+      const firstName = a.firstName || '';
+      const lastName = a.lastName || '';
+      const displayName = [firstName, lastName].filter(Boolean).join(' ') || 'Unknown';
       const personKey = number + '|' + displayName.trim().toLowerCase();
 
       if (seen.has(personKey)) continue;
@@ -733,8 +735,10 @@ router.get(
       clients.push({
         id: a.id,
         number,
+        firstName,
+        lastName,
         fullName: displayName,
-        allNames: [displayName],
+        allNames: [displayName, firstName, lastName].filter(Boolean),
         lastAppointment: a.scheduledStart || a.date || a.createdAt,
         appointmentCount: 1,
         service: a.service || '',

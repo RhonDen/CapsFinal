@@ -48,8 +48,11 @@ function Clients() {
     fetchClients();
   }, []);
 
-  // Searchable by name or phone digits. Names use word-boundary matching;
-  // phone numbers use partial digit matching so searching a number shows
+  // Searchable by name or phone digits.
+  // Names use substring matching so typing "Geo" immediately shows "George",
+  // and a name is matched whether it appears as a first name OR last name
+  // (e.g. "George" matches both "George Cruz" and "Maria George").
+  // Phone numbers use partial digit matching so searching a number shows
   // every person sharing that number (even with different names).
   const filteredClients = useMemo(() => {
     let result = clients;
@@ -57,21 +60,23 @@ function Clients() {
     const phoneQuery = phoneFilter.replace(/\D/g, '').trim();
 
     if (nameQuery) {
-      // Match on whole words so partial substrings don't bring unrelated clients.
       const nameParts = nameQuery.split(/\s+/).filter(Boolean);
       result = result.filter((client) => {
-        const namePartsList = [
-          getClientName(client).toLowerCase(),
-          ...(Array.isArray(client.allNames) ? client.allNames : []).map((n) =>
-            String(n || '').toLowerCase()
-          ),
-        ];
-        const allNameText = namePartsList.join(' ');
-        return nameParts.every((part) => {
-          // Match if the part appears as a whole word (boundary) in any name.
-          const escaped = part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          return new RegExp(`(^|\\s)${escaped}(\\s|$)`).test(allNameText);
-        });
+        // Build a searchable string from full name AND each individual
+        // name token (first & last) so substring matches work across both.
+        const firstName = String(client.firstName || '').toLowerCase();
+        const lastName = String(client.lastName || '').toLowerCase();
+        const fullName = getClientName(client).toLowerCase();
+        const allNames = (Array.isArray(client.allNames) ? client.allNames : [])
+          .map((n) => String(n || '').toLowerCase())
+          .join(' ');
+
+        const haystack = [fullName, firstName, lastName, allNames]
+          .filter(Boolean)
+          .join(' ');
+
+        // Every typed token must appear as a substring somewhere in the name.
+        return nameParts.every((part) => haystack.includes(part));
       });
     }
     if (phoneQuery) {

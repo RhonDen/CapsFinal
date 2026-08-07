@@ -1230,6 +1230,151 @@ function DataAnalysis() {
         </div>
       )}
 
+      {/* ── ABOUT THESE ANALYSES (plain-language explanations) ── */}
+      <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8">
+        <div className="mb-4 flex items-center gap-2">
+          <Info className="h-5 w-5 text-silver-lake" />
+          <h2 className="text-xl font-bold text-maastricht dark:text-slate-100">
+            About These Analyses
+          </h2>
+        </div>
+        <p className="mb-6 text-sm text-police dark:text-slate-300">
+          A plain-language guide to what each section shows and how to read it.
+        </p>
+
+        <div className="space-y-6">
+          {/* Descriptive */}
+          <div>
+            <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
+              Descriptive Analytics — “What happened?”
+            </h3>
+            <p className="mt-1 text-sm text-police dark:text-slate-300">
+              This is a snapshot of the appointments in the selected period. The
+              <strong> donut chart</strong> shows which services were booked most, the
+              <strong> appointments by day</strong> line shows how volume changed across the
+              period, the <strong>status distribution</strong> bars break down how many
+              appointments were approved, rejected, completed, not completed, or cancelled,
+              and <strong>peak hours</strong> tells you which times of day see the most bookings.
+              It answers the basic question: “what actually happened during this time?”
+            </p>
+          </div>
+
+          {/* Diagnostic */}
+          <div>
+            <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
+              Diagnostic Analytics — “Why did it happen?”
+            </h3>
+            <p className="mt-1 text-sm text-police dark:text-slate-300">
+              This digs deeper into patterns. The <strong>appointments by day of week</strong>{' '}
+              chart shows which weekdays are busiest or quietest, and the{' '}
+              <strong>service × day correlation</strong> table shows which services are most
+              popular on which days. This helps you plan staffing and promotions around real
+              booking patterns instead of guessing.
+            </p>
+          </div>
+
+          {/* Predictive */}
+          <div>
+            <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
+              Predictive Analytics — “What might happen next?”
+            </h3>
+            <p className="mt-1 text-sm text-police dark:text-slate-300">
+              This estimates next month’s demand using a rolling average of the previous few
+              months of appointment volume. It deliberately avoids aggressive growth formulas,
+              so the forecast is conservative and realistic. It’s a guide for capacity planning,
+              not an exact promise.
+            </p>
+          </div>
+
+          {/* Logistic Regression */}
+          <div>
+            <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
+              Logistic Regression — “How likely is an appointment to be completed?”
+            </h3>
+            <p className="mt-1 text-sm text-police dark:text-slate-300">
+              This is a real statistical model (not raw counts). It learns from your finalized
+              appointments which factors are linked to completion — like the service booked,
+              the time of day, the day of the week, and whether it was a walk-in — and outputs a
+              continuous <strong>probability (0–100%)</strong> that an appointment will be
+              completed. It never forces a hard “yes/no” answer; instead it gives a risk score.
+              The <strong>S-curve</strong> shows how completion probability changes across the
+              hours of the day. The <strong>feature importance</strong> section shows which
+              factors most strongly increase or decrease the odds of completion, and the{' '}
+              <strong>model performance</strong> metrics (accuracy, precision, recall, F1, AUC)
+              tell you how well the model fits the data.
+            </p>
+          </div>
+
+          {/* Comparison */}
+          <div>
+            <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
+              Period Comparison — “How does this period compare to the last one?”
+            </h3>
+            <p className="mt-1 text-sm text-police dark:text-slate-300">
+              This compares the current month or year against the previous one and shows the
+              percentage change in total appointments. A green “+” means growth, a red “−“
+              means decline. It’s a quick pulse check on whether business is trending up or down.
+            </p>
+          </div>
+
+          {/* Rejection & Cancellation */}
+          <div>
+            <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
+              Rejection &amp; Cancellation Analysis — “Where are we losing appointments?”
+            </h3>
+            <p className="mt-1 text-sm text-police dark:text-slate-300">
+              This highlights which services are being rejected most often or most frequently not
+              completed (no-shows). If a particular service has a high no-show rate, you may want
+              to follow up with those patients or adjust how those appointments are scheduled.
+            </p>
+          </div>
+
+          {/* Status Timeline */}
+          <div>
+            <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
+              Status Timeline — “How do appointments move through their lifecycle?”
+            </h3>
+            <p className="mt-1 text-sm text-police dark:text-slate-300">
+              This stacked bar chart tracks how many appointments were approved, rejected,
+              completed, or not completed on each day of the period. It helps you spot days with
+              unusual outcomes — for example, a spike in no-shows on a particular date.
+            </p>
+          </div>
+
+          {/* Walk-in vs Online */}
+          <div>
+            <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
+              Walk-in vs Online — “How are patients booking?”
+            </h3>
+            <p className="mt-1 text-sm text-police dark:text-slate-300">
+              This shows the split between patients who booked online and those who walked in.
+              It helps you understand which booking channel drives the most volume so you can
+              invest in the right one.
+            </p>
+          </div>
+
+          {/* Service Trend */}
+          <div>
+            <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
+              Service Popularity Trend — “Which services are growing or shrinking?”
+            </h3>
+            <p className="mt-1 text-sm text-police dark:text-slate-300">
+              This shows the month-over-month demand for each service over the last six months.
+              It reveals which services are gaining traction and which ones may need more
+              promotion.
+            </p>
+          </div>
+
+          <p className="border-t border-slate-100 pt-4 text-xs text-police dark:border-slate-700 dark:text-slate-400">
+            For the full mathematical formulas behind each analysis, see the{' '}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono dark:bg-slate-700 dark:text-slate-200">
+              ANALYTICS_FORMULAS.md
+            </code>{' '}
+            file at the project root.
+          </p>
+        </div>
+      </div>
+
         </>
       )}
 

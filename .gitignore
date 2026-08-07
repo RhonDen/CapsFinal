@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Build output
+client/dist/
+dist/
+
+# Environment
+.env
+.env.local
+*.env
+
+# Logs
+*.log
+npm-debug.log*
+server/*.log
+server/server_start.err
+server/server_start.log
+
+# Database (keep if you want to commit the sqlite db, remove to ignore)
+# server/database.sqlite
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Junk / debug scripts
+server/_*.js
+server/smoke-test.js
+server/tmp_*
+cookies*.txt
+__filelist*.txt
+README_EVERYTHING_*.txt
+README_FULL_CODE_GUIDE.txt
+PROXY_TRIAGE.md
+GUIDE.md
