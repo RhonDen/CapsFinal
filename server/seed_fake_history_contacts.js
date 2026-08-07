@@ -119,6 +119,7 @@ async function seedFakeHistoryContacts({
   manageConnection = true,
   total: requestedTotal,
   contactTotal: requestedContactTotal,
+  seedContacts = true,
 } = {}) {
   const { Op } = require('sequelize');
 
@@ -254,28 +255,36 @@ async function seedFakeHistoryContacts({
     console.log(`Seeded ${appointments.length} fake history appointments.`);
 
     // ── 3. Seed fake CONTACT messages ────────────────────────────────────────
-    const contactTotal = Math.min(12, Math.max(5, Number(requestedContactTotal || process.env.SEED_FAKE_CONTACTS_TOTAL || 12)));
     const contactMessages = [];
 
-    for (let i = 0; i < contactTotal; i++) {
-      const name = CONTACT_NAMES[i % CONTACT_NAMES.length];
-      const email = CONTACT_EMAILS[i % CONTACT_EMAILS.length];
-      const message = CONTACT_MESSAGES[i % CONTACT_MESSAGES.length];
-      const createdAt = addDays(today, -randInt(0, 14));
+    if (seedContacts) {
+      const contactTotal = Math.min(
+        12,
+        Math.max(5, Number(requestedContactTotal || process.env.SEED_FAKE_CONTACTS_TOTAL || 12))
+      );
 
-      contactMessages.push({
-        name,
-        email,
-        message,
-        read: Math.random() < 0.4, // ~40% already read, rest unread for the badge
-        ipAddress: '',
-        createdAt,
-        updatedAt: createdAt,
-      });
+      for (let i = 0; i < contactTotal; i++) {
+        const name = CONTACT_NAMES[i % CONTACT_NAMES.length];
+        const email = CONTACT_EMAILS[i % CONTACT_EMAILS.length];
+        const message = CONTACT_MESSAGES[i % CONTACT_MESSAGES.length];
+        const createdAt = addDays(today, -randInt(0, 14));
+
+        contactMessages.push({
+          name,
+          email,
+          message,
+          read: Math.random() < 0.4, // ~40% already read, rest unread for the badge
+          ipAddress: '',
+          createdAt,
+          updatedAt: createdAt,
+        });
+      }
+
+      await ContactMessage.bulkCreate(contactMessages);
+      console.log(`Seeded ${contactMessages.length} fake contact messages.`);
+    } else {
+      console.log('Skipped fake contact message seeding (SEED_FAKE_CONTACTS is not true).');
     }
-
-    await ContactMessage.bulkCreate(contactMessages);
-    console.log(`Seeded ${contactMessages.length} fake contact messages.`);
 
     const fromLabel = dateKeyFromLocalDate(windowStart);
     const toLabel = dateKeyFromLocalDate(windowEnd);

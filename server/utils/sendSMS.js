@@ -5,8 +5,8 @@ const UNISMS_ENDPOINT = 'https://unismsapi.com/api/sms';
 
 // Try known API keys in order until one works.
 const UNISMS_API_KEYS = [
-  process.env.UNISMS_API_KEY || 'sk_b27982d7-8017-47b3-9433-b338b61a5fae',
-  process.env.UNISMS_API_KEY_BACKUP || 'sk_12345678-1234-1234-1234-123456789012',
+  process.env.UNISMS_API_KEY || process.env.UNI_SMS_API_KEY || 'sk_b27982d7-8017-47b3-9433-b338b61a5fae',
+  process.env.UNISMS_API_KEY_BACKUP || process.env.UNI_SMS_API_KEY_BACKUP || 'sk_12345678-1234-1234-1234-123456789012',
 ].filter(Boolean);
 
 const getUnismsSenderIdCandidates = () => {

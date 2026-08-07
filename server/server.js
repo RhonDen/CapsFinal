@@ -135,14 +135,16 @@ const startServer = async () => {
     // The seed function purges old [FAKE] rows before inserting new ones, so
     // real appointments and contacts are never touched.
     try {
-      console.log('Auto-seeding fake May history and contacts...');
+      console.log('Auto-seeding fake May history...');
       const { seedFakeHistoryContacts } = require('./seed_fake_history_contacts');
       const seedResult = await seedFakeHistoryContacts({
         manageConnection: false,
         total: 60,
         contactTotal: 12,
+        seedContacts: process.env.SEED_FAKE_CONTACTS === 'true',
       });
-      console.log(`Auto-seed complete: ${seedResult.appointments} history appointments (${seedResult.from} to ${seedResult.to}), ${seedResult.contacts} contacts.`);
+      const contactSummary = seedResult.contacts ? `${seedResult.contacts} contacts` : '0 contacts (disabled)';
+      console.log(`Auto-seed complete: ${seedResult.appointments} history appointments (${seedResult.from} to ${seedResult.to}), ${contactSummary}.`);
     } catch (seedError) {
       console.error('Auto-seed fake history/contacts error (non-fatal):', seedError.message);
     }
