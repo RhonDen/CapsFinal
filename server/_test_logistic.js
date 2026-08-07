@@ -101,6 +101,12 @@ for (const [k, v] of Object.entries(result.metrics)) {
   console.log(`  ${k}: ${v.toFixed(4)}`);
 }
 
+console.log('\nsigmoidCurve:', result.sigmoidCurve ? `${result.sigmoidCurve.length} points` : 'MISSING');
+if (result.sigmoidCurve && result.sigmoidCurve.length > 0) {
+  console.log('  first:', JSON.stringify(result.sigmoidCurve[0]));
+  console.log('  last:', JSON.stringify(result.sigmoidCurve[result.sigmoidCurve.length - 1]));
+}
+
 // Assertions
 const checks = [
   ['trained is true', result.trained === true],
@@ -111,6 +117,8 @@ const checks = [
   ['featureImportance non-empty', result.featureImportance.length > 0],
   ['metrics has accuracy', typeof result.metrics.accuracy === 'number'],
   ['metrics has auc', typeof result.metrics.auc === 'number'],
+  ['sigmoidCurve has 24 points (0-23h)', Array.isArray(result.sigmoidCurve) && result.sigmoidCurve.length >= 20],
+  ['sigmoidCurve probabilities in [0,1]', Array.isArray(result.sigmoidCurve) && result.sigmoidCurve.every((p) => p.probability >= 0 && p.probability <= 1)],
   ['walk-in probability > online (expected)', 
     (() => {
       const walkIn = result.serviceProbabilities.length ? result.overallProbability : 0;

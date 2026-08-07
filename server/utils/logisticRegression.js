@@ -294,6 +294,46 @@ function trainLogisticRegression(appointments, seed = 42) {
   const overallProbability =
     predictions.reduce((s, p) => s + p, 0) / predictions.length;
 
+  // ── Sigmoid curve (probability vs hour of day) ──
+  // Builds the classic S-curve by sweeping the hour-of-day feature from 0–23
+  // while holding all other features at their training-set mean. This gives
+  // the admin a visual of the actual logistic function, not just bars.
+  const sigmoidCurve = [];
+  {
+    // Mean values for the non-hour continuous/binary features.
+    const meanIsWalkIn =
+      featureRows.reduce((s, r) => s + r[0], 0) / n;
+    const meanDow = featureRows.reduce((s, r) => s + r[2], 0) / n;
+    const meanMonth = featureRows.reduce((s, r) => s + r[3], 0) / n;
+    const meanDuration = featureRows.reduce((s, r) => s + r[4], 0) / n;
+
+    // Use the most common service as the reference one-hot.
+    const refServiceIdx = 0;
+
+    for (let hour = 0; hour <= 23; hour++) {
+      // Raw feature vector matching encodeServices() layout.
+      const raw = [
+        meanIsWalkIn,
+        hour,
+        meanDow,
+        meanMonth,
+        meanDuration,
+      ];
+      for (let i = 0; i < MAX_SERVICE_FEATURES; i++) {
+        raw.push(i === refServiceIdx ? 1 : 0);
+      }
+
+      // Standardize using the training stats, then predict.
+      const row = raw.map((val, j) => (val - means[j]) / stds[j]);
+      const z = bias + weights.reduce((sum, w, j) => sum + w * row[j], 0);
+      sigmoidCurve.push({
+        hour,
+        label: `${hour}:00`,
+        probability: Number(sigmoid(z).toFixed(4)),
+      });
+    }
+  }
+
   return {
     trained: true,
     method: 'logistic-regression',
@@ -303,6 +343,7 @@ function trainLogisticRegression(appointments, seed = 42) {
     serviceProbabilities,
     dowProbabilities,
     featureImportance,
+    sigmoidCurve,
     metrics: {
       accuracy,
       precision,

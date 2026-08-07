@@ -11,6 +11,7 @@ import {
   LineChart,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -540,6 +541,58 @@ function DataAnalysis() {
                         <p className="mt-1 text-sm text-police dark:text-slate-300">
                           finalized appointments used to fit the model
                         </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sigmoid curve (the actual logistic regression line) */}
+                  {data.logisticRegression.sigmoidCurve &&
+                    data.logisticRegression.sigmoidCurve.length > 0 && (
+                    <div className="mb-6 rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+                      <h3 className="mb-1 text-lg font-semibold text-maastricht dark:text-slate-100">
+                        The Logistic Regression S-Curve
+                      </h3>
+                      <p className="mb-4 text-sm text-police dark:text-slate-300">
+                        Probability of completion vs. hour of day (other features held at their
+                        average). This is the actual sigmoid function the model learned — a
+                        continuous curve, not a hard “yes/no” classification.
+                      </p>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={data.logisticRegression.sigmoidCurve}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="label"
+                              tick={{ fontSize: 11 }}
+                              interval={2}
+                              angle={-35}
+                              textAnchor="end"
+                              height={60}
+                            />
+                            <YAxis
+                              domain={[0, 1]}
+                              tickFormatter={(v) => `${Math.round(v * 100)}%`}
+                              width={50}
+                            />
+                            <Tooltip
+                              formatter={(value) => [`${Math.round(value * 100)}%`, 'Completion probability']}
+                              labelFormatter={(label) => `Time: ${label}`}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="probability"
+                              stroke="#0C243D"
+                              strokeWidth={3}
+                              dot={false}
+                              activeDot={{ r: 5 }}
+                              name="Completion probability"
+                            />
+                            {/* Reference lines at 50%, 25%, 75% */}
+                            <ReferenceLine y={0.5} stroke="#94A3B8" strokeDasharray="4 4" />
+                            <ReferenceLine y={0.75} stroke="#CBD5E1" strokeDasharray="4 4" />
+                            <ReferenceLine y={0.25} stroke="#CBD5E1" strokeDasharray="4 4" />
+                          </LineChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
                   )}
