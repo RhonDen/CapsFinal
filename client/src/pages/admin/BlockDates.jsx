@@ -53,11 +53,32 @@ function BlockDates() {
     setError('');
 
     try {
-    await api.post('/api/admin/block-dates', { date: newDate, reason });
+      await api.post('/api/admin/block-dates', { date: newDate, reason });
       setReason('');
       await fetchDates();
     } catch (requestError) {
-      setError(requestError.response?.data?.error || 'Unable to block that date.');
+      const conflictData = requestError.response?.data;
+      if (requestError.response?.status === 409 && conflictData?.conflicts) {
+        const message = `There are ${conflictData.conflicts.length} appointment(s) already scheduled on ${newDate}. Please contact the clients before blocking. Do you want to continue?`;
+        const continueBlocking = window.confirm(message);
+        if (continueBlocking) {
+          try {
+            await api.post('/api/admin/block-dates', { date: newDate, reason, confirm: true });
+            setReason('');
+            await fetchDates();
+            setLoading(false);
+            return;
+          } catch (confirmError) {
+            setError(confirmError.response?.data?.error || 'Unable to block that date after confirmation.');
+            return;
+          }
+        }
+
+        setError('Blocking canceled. Please contact clients before blocking the date.');
+        return;
+      }
+
+      setError(conflictData?.error || 'Unable to block that date.');
     } finally {
       setLoading(false);
     }

@@ -641,13 +641,16 @@ router.get(
 router.post(
   '/block-dates',
   auth,
-  [body('date').isISO8601().withMessage('A valid date is required.')],
+  [
+    body('date').isISO8601().withMessage('A valid date is required.'),
+    body('confirm').optional().isBoolean().withMessage('Confirm must be a boolean.'),
+  ],
   asyncHandler(async (req, res) => {
     if (!validate(req, res)) {
       return;
     }
 
-    const { date, reason } = req.body;
+    const { date, reason, confirm } = req.body;
     const normalizedDate = normalizeDateOnly(date);
     const dayRange = getDayRange(date);
 
@@ -659,6 +662,29 @@ router.post(
 
     if (existing) {
       return res.status(400).json({ error: 'Date already blocked or invalid.' });
+    }
+
+    const dateKey = dateKeyFromDateValue(normalizedDate);
+    const appointmentsOnDate = await Appointment.findAll({
+      where: {
+        dateKey,
+        status: { [Op.not]: 'cancelled' },
+      },
+      order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']],
+    });
+
+    if (appointmentsOnDate.length > 0 && !confirm) {
+      return res.status(409).json({
+        error: `There are ${appointmentsOnDate.length} appointment(s) scheduled on ${dateKey}. Please contact the clients before blocking this date.`,
+        conflicts: appointmentsOnDate.map((appointment) => ({
+          id: appointment.id,
+          fullName: formatName(appointment),
+          service: appointment.service,
+          time: appointment.time,
+          status: appointment.status,
+          number: appointment.number,
+        })),
+      });
     }
 
     const blocked = await BlockedDate.create({ date: normalizedDate, reason: reason || '' });
@@ -982,31 +1008,24 @@ router.get(
 
       const monthlyCounts = new Map();
       for (const { dt } of historicalRows) {
-        const key = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2, '0');
+        const key = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
         monthlyCounts.set(key, (monthlyCounts.get(key) || 0) + 1);
       }
 
-      const counts = Array.from(monthlyCounts.values());
-      let avgGrowth = 0;
-      if (counts.length >= 2) {
-        let totalGrowth = 0;
-        for (let i = 1; i < counts.length; i++) {
-          if (counts[i-1] > 0) totalGrowth += (counts[i] - counts[i-1]) / counts[i-1];
-        }
-        avgGrowth = totalGrowth / (counts.length - 1);
-      }
+      const sortedCounts = Array.from(monthlyCounts.entries())
+        .sort(([a], [b]) => (a < b ? -1 : 1))
+        .map(([, count]) => count);
 
       const currentCount = appointmentsInRange.length;
-      const projectedNext = Math.round(currentCount * (1 + avgGrowth));
-      const projectedAfter = Math.round(projectedNext * (1 + avgGrowth));
+      const recentCounts = [...sortedCounts, currentCount].slice(-3);
+      const projectedNext = Math.round(
+        recentCounts.reduce((sum, value) => sum + value, 0) / Math.max(recentCounts.length, 1)
+      );
 
       const nextMonth = new Date(start.getFullYear(), start.getMonth() + 1, 1);
-      const afterMonth = new Date(start.getFullYear(), start.getMonth() + 2, 1);
-
       predictiveForecast = [
         { period: start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), actual: currentCount },
         { period: nextMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), projected: projectedNext },
-        { period: afterMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), projected: projectedAfter },
       ];
     }
 

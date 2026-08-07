@@ -464,7 +464,7 @@ function DataAnalysis() {
                 <Info className="h-4 w-4 text-silver-lake" title="Forecast based on historical trends" />
               </div>
               <p className="mb-4 text-sm text-police dark:text-slate-300">
-                What might happen? — Forecast based on historical trends and demand patterns.
+                What might happen? — Forecast uses the selected month and recent historical appointment volume to estimate next-month demand, avoiding unrealistic compounding growth.
               </p>
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 {data.predictive.forecast.map((item, idx) => (
