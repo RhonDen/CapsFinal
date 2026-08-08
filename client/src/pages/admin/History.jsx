@@ -135,10 +135,9 @@ function History() {
   }, [fetchHistory]);
 
   // Flat list — no phone grouping. Sort by date descending.
-  // When a search query is present, filter client-side by name or phone digits.
+  // When a search query is present, filter client-side by name only.
   const sortedAppointments = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const qDigits = normalizePhoneDigits(searchQuery);
     const activePhoneFilter = normalizePhoneDigits(phoneFilter);
     const searchTokens = q.split(/\s+/).filter(Boolean);
 
@@ -152,14 +151,7 @@ function History() {
         const numberDigits = normalizePhoneDigits(a.number);
         const filterVariants = buildPhoneSearchVariants(activePhoneFilter);
 
-        const searchMatches = searchTokens.every((token) => {
-          const tokenDigits = normalizePhoneDigits(token);
-          const tokenNameMatch = nameStr.includes(token);
-          const tokenPhoneMatch = tokenDigits
-            ? buildPhoneSearchVariants(token).some((variant) => numberDigits.includes(variant))
-            : false;
-          return tokenNameMatch || tokenPhoneMatch;
-        });
+        const searchMatches = searchTokens.every((token) => nameStr.includes(token));
 
         const phoneFilterMatches = activePhoneFilter
           ? filterVariants.some((variant) => numberDigits.includes(variant))
@@ -280,7 +272,7 @@ function History() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Name or number…"
+                placeholder="Search by patient name…"
                 className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-300 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100"
               />
             </div>

@@ -47,6 +47,59 @@ function buildPhoneSearchVariants(value) {
   return Array.from(variants);
 }
 
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightMatches(text, tokens) {
+  const value = String(text || '');
+  const terms = tokens.filter(Boolean).map((token) => escapeRegExp(token));
+  if (terms.length === 0) return value;
+
+  const regex = new RegExp(`(${terms.join('|')})`, 'i');
+  const parts = value.split(regex);
+  return parts.map((part, index) =>
+    regex.test(part) ? (
+      <mark key={index} className="rounded bg-amber-100 px-0.5 text-amber-900">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
+function getClientRelevance(client, searchTokens, phoneQuery) {
+  const nameFields = [
+    String(client.firstName || '').trim().toLowerCase(),
+    String(client.lastName || '').trim().toLowerCase(),
+    getClientName(client).toLowerCase(),
+    ...(Array.isArray(client.allNames) ? client.allNames : []),
+  ].filter(Boolean);
+  const rawDigits = normalizePhoneDigits(client.number);
+  let score = 0;
+
+  searchTokens.forEach((token) => {
+    const tokenDigits = normalizePhoneDigits(token);
+    const tokenNameMatch = nameFields.some((field) => field.includes(token));
+    const tokenExactNameMatch = nameFields.some((field) => field.startsWith(token));
+    const tokenNumberMatch = tokenDigits
+      ? buildPhoneSearchVariants(token).some((variant) => rawDigits.includes(variant))
+      : false;
+
+    if (tokenNameMatch) score += 20;
+    if (tokenExactNameMatch) score += 10;
+    if (tokenNumberMatch) score += 5;
+  });
+
+  if (phoneQuery) {
+    const phoneMatch = buildPhoneSearchVariants(phoneQuery).some((variant) => rawDigits.includes(variant));
+    if (phoneMatch) score += 5;
+  }
+
+  return score;
+}
+
 function Clients() {
   const [clients, setClients] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,18 +152,25 @@ function Clients() {
           .map((n) => String(n || '').trim().toLowerCase())
           .filter(Boolean);
 
-        const allNameText = nameFields.join(' ');
         const rawDigits = normalizePhoneDigits(client.number);
 
         return searchTokens.every((token) => {
           const tokenDigits = normalizePhoneDigits(token);
-          const nameMatch = allNameText.includes(token);
+          const nameMatch = nameFields.some((field) => field.includes(token));
           const numberMatch = tokenDigits
             ? buildPhoneSearchVariants(token).some((variant) => rawDigits.includes(variant))
             : false;
           return nameMatch || numberMatch;
         });
       });
+
+      result = result
+        .map((client) => ({
+          client,
+          score: getClientRelevance(client, searchTokens, phoneQuery),
+        }))
+        .sort((a, b) => b.score - a.score)
+        .map((item) => item.client);
     }
 
     if (phoneQuery) {
@@ -123,6 +183,12 @@ function Clients() {
 
     return result;
   }, [clients, searchQuery, phoneFilter]);
+
+  const highlightTokens = useMemo(() => {
+    const tokens = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (phoneFilter) tokens.push(phoneFilter.toLowerCase());
+    return Array.from(new Set(tokens));
+  }, [searchQuery, phoneFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
   const paginatedClients = filteredClients.slice(
@@ -234,10 +300,10 @@ function Clients() {
                 {paginatedClients.map((client) => (
                   <tr key={client.number || client.id} className="transition hover:bg-slate-50">
                     <td className="px-5 py-3.5 text-sm font-medium text-slate-900 sm:px-6">
-                      {getClientName(client)}
+                      {highlightMatches(getClientName(client), highlightTokens)}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-sm text-slate-600 sm:px-6">
-                      {client.number || '—'}
+                      {highlightMatches(client.number || '—', highlightTokens)}
                     </td>
                     <td className="hidden whitespace-nowrap px-5 py-3.5 text-sm text-slate-600 sm:table-cell sm:px-6">
                       {formatDateTime(client.lastAppointment)}
