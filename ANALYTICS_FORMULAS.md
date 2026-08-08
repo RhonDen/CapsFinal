@@ -79,6 +79,12 @@ This deliberately avoids exponential smoothing or compounding growth to keep pro
 
 ## 4. Logistic Regression — Completion Probability
 
+### Date Range Scoping
+
+The logistic regression model is trained **only on finalized (non-pending) appointments that fall within the selected date range** — the same `appointmentsInRange` used for descriptive, diagnostic, and prescriptive analytics. This means the completion probabilities, per-service probabilities, per-day-of-week probabilities, feature importance, and model metrics all reflect the chosen period (daily, weekly, monthly, yearly, or predictive).
+
+If fewer than 10 finalized appointments fall within the selected range, the model returns `trained: false` with a graceful message instead of producing unreliable results.
+
 ### Prediction Target
 
 \[

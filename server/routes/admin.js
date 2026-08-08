@@ -1223,11 +1223,14 @@ router.get(
     }
 
     // â”€â”€ 11. LOGISTIC REGRESSION (Probability of completion) â”€â”€
-    // Trains a logistic regression model on all finalized (non-pending)
-    // appointments to estimate the PROBABILITY of completion (0–1), not a
-    // hard class label. Returns per-service probabilities, per-day-of-week
-    // probabilities, feature importance, and model metrics.
-    const logisticRegression = trainLogisticRegression(rows);
+    // Trains a logistic regression model on the finalized (non-pending)
+    // appointments WITHIN the selected date range to estimate the PROBABILITY
+    // of completion (0–1), not a hard class label. Returns per-service
+    // probabilities, per-day-of-week probabilities, feature importance, and
+    // model metrics — all scoped to the chosen period.
+    const logisticRegression = trainLogisticRegression(
+      appointmentsInRange.map((x) => x.obj)
+    );
 
     res.json({
       descriptive: { pie, line, bar, peakHours },

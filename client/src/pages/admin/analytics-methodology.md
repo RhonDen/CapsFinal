@@ -42,6 +42,8 @@ This document explains how the analytics dashboard calculates each section.
 
 The analytics dashboard now includes a **logistic regression model** that predicts the **probability of appointment completion** (a continuous 0–1 score), not a hard class label. This replaces the raw-count "predictive" approach with a real statistical model.
 
+> **Date range scoping:** the model is trained **only on finalized (non-pending) appointments within the selected date range** — so it respects the Daily/Weekly/Monthly/Yearly/Predictive filter just like every other analytics section. If fewer than 10 finalized appointments fall within the selected range, it gracefully reports `trained: false` instead of producing unreliable results.
+
 ### What it predicts
 
 - **Target:** `P(completed = 1)` — the probability that a finalized appointment is completed.
