@@ -24,6 +24,29 @@ function getClientName(client) {
   return parts.length ? parts.join(' ') : 'Unknown';
 }
 
+function normalizePhoneDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function buildPhoneSearchVariants(value) {
+  const digits = normalizePhoneDigits(value);
+  if (!digits) return [];
+
+  const variants = new Set([digits]);
+  if (digits.startsWith('0')) {
+    variants.add('63' + digits.slice(1));
+    variants.add(digits.slice(1));
+  } else if (digits.startsWith('63')) {
+    variants.add('0' + digits.slice(2));
+    variants.add(digits.slice(2));
+  } else if (digits.startsWith('9')) {
+    variants.add('0' + digits);
+    variants.add('63' + digits);
+  }
+
+  return Array.from(variants);
+}
+
 function Clients() {
   const [clients, setClients] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,13 +84,12 @@ function Clients() {
   // vs the "09..." the admin types) so partial typing works immediately.
   const filteredClients = useMemo(() => {
     let result = clients;
-    const nameQuery = searchQuery.trim().toLowerCase();
-    const phoneQuery = phoneFilter.replace(/\D/g, '').trim();
+    const searchValue = searchQuery.trim().toLowerCase();
+    const phoneQuery = normalizePhoneDigits(phoneFilter);
 
-    if (nameQuery) {
-      const nameParts = nameQuery.split(/\s+/).filter(Boolean);
+    if (searchValue) {
+      const searchTokens = searchValue.split(/\s+/).filter(Boolean);
       result = result.filter((client) => {
-        // Collect each name field as its OWN string (no concatenation).
         const nameFields = [
           String(client.firstName || ''),
           String(client.lastName || ''),
@@ -77,40 +99,25 @@ function Clients() {
           .map((n) => String(n || '').trim().toLowerCase())
           .filter(Boolean);
 
-        // Every typed token must be a substring of at least ONE name field.
-        // This ensures a token never accidentally spans two different names.
-        return nameParts.every((part) =>
-          nameFields.some((field) => field.includes(part))
-        );
+        const allNameText = nameFields.join(' ');
+        const rawDigits = String(client.number || '').replace(/\D/g, '');
+
+        return searchTokens.every((token) => {
+          const tokenDigits = normalizePhoneDigits(token);
+          const tokenNameMatch = tokenDigits ? false : allNameText.includes(token);
+          const tokenPhoneMatch = tokenDigits
+            ? buildPhoneSearchVariants(token).some((variant) => rawDigits.includes(variant))
+            : false;
+          return tokenNameMatch || tokenPhoneMatch;
+        });
       });
     }
-    if (phoneQuery) {
-      // Normalize the query: if the admin types "09...", also try the
-      // E.164 form "639..." (and vice-versa) so partial typing works.
-      const qDigits = phoneQuery;
-      const q63 = qDigits.startsWith('0')
-        ? '63' + qDigits.slice(1)
-        : qDigits.startsWith('63')
-        ? '0' + qDigits.slice(2)
-        : qDigits;
 
+    if (phoneQuery) {
+      const phoneVariants = buildPhoneSearchVariants(phoneFilter);
       result = result.filter((client) => {
         const rawDigits = String(client.number || '').replace(/\D/g, '');
-        const last10 = rawDigits.slice(-10);
-        // Also build a "0-prefixed" variant of the stored number so a
-        // search for "09..." matches "+63917..." correctly.
-        const withZero = last10.startsWith('63')
-          ? '0' + last10.slice(2)
-          : last10;
-
-        return (
-          rawDigits.includes(qDigits) ||
-          rawDigits.includes(q63) ||
-          last10.includes(qDigits) ||
-          last10.includes(q63) ||
-          withZero.includes(qDigits) ||
-          withZero.includes(q63)
-        );
+        return phoneVariants.some((variant) => rawDigits.includes(variant));
       });
     }
     return result;
@@ -167,7 +174,7 @@ function Clients() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by patient name…"
+              placeholder="Search by patient name or phone…"
               className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-300 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100"
             />
           </div>

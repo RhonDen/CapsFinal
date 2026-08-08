@@ -58,6 +58,29 @@ function getPatientName(row) {
   return parts.length ? parts.join(' ') : 'Unknown';
 }
 
+function normalizePhoneDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function buildPhoneSearchVariants(value) {
+  const digits = normalizePhoneDigits(value);
+  if (!digits) return [];
+
+  const variants = new Set([digits]);
+  if (digits.startsWith('0')) {
+    variants.add('63' + digits.slice(1));
+    variants.add(digits.slice(1));
+  } else if (digits.startsWith('63')) {
+    variants.add('0' + digits.slice(2));
+    variants.add(digits.slice(2));
+  } else if (digits.startsWith('9')) {
+    variants.add('0' + digits);
+    variants.add('63' + digits);
+  }
+
+  return Array.from(variants);
+}
+
 const ITEMS_PER_PAGE = 10;
 
 function History() {
@@ -115,25 +138,34 @@ function History() {
   // When a search query is present, filter client-side by name or phone digits.
   const sortedAppointments = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const qDigits = q.replace(/\D/g, '');
+    const qDigits = normalizePhoneDigits(searchQuery);
+    const activePhoneFilter = normalizePhoneDigits(phoneFilter);
+    const searchTokens = q.split(/\s+/).filter(Boolean);
 
     let rows = appointments;
-    if (q) {
+    if (searchTokens.length > 0 || activePhoneFilter) {
       rows = rows.filter((a) => {
-        const nameStr = [a.firstName, a.lastName, a.middleInitial]
+        const nameStr = [a.firstName, a.middleInitial, a.lastName, a.fullName]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
-        const fullNameStr = String(a.fullName || '').toLowerCase();
-        const numberStr = String(a.number || '').toLowerCase();
-        if (qDigits) {
-          return (
-            numberStr.replace(/\D/g, '').includes(qDigits) ||
-            fullNameStr.includes(q) ||
-            nameStr.includes(q)
-          );
-        }
-        return fullNameStr.includes(q) || nameStr.includes(q) || numberStr.includes(q);
+        const numberDigits = normalizePhoneDigits(a.number);
+        const filterVariants = buildPhoneSearchVariants(activePhoneFilter);
+
+        const searchMatches = searchTokens.every((token) => {
+          const tokenDigits = normalizePhoneDigits(token);
+          const tokenNameMatch = nameStr.includes(token);
+          const tokenPhoneMatch = tokenDigits
+            ? buildPhoneSearchVariants(token).some((variant) => numberDigits.includes(variant))
+            : false;
+          return tokenNameMatch || tokenPhoneMatch;
+        });
+
+        const phoneFilterMatches = activePhoneFilter
+          ? filterVariants.some((variant) => numberDigits.includes(variant))
+          : true;
+
+        return searchMatches && phoneFilterMatches;
       });
     }
 
@@ -142,7 +174,7 @@ function History() {
       const bDate = b.scheduledStart || b.date || b.createdAt;
       return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
-  }, [appointments, searchQuery]);
+  }, [appointments, searchQuery, phoneFilter]);
 
   const totalPages = Math.max(1, Math.ceil(sortedAppointments.length / ITEMS_PER_PAGE));
   const paginatedAppointments = sortedAppointments.slice(
