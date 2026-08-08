@@ -1230,138 +1230,215 @@ function DataAnalysis() {
         </div>
       )}
 
-      {/* ── ABOUT THESE ANALYSES (plain-language explanations) ── */}
+      {/* ── ABOUT THESE ANALYSES (actionable guide) ── */}
       <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8">
         <div className="mb-4 flex items-center gap-2">
           <Info className="h-5 w-5 text-silver-lake" />
           <h2 className="text-xl font-bold text-maastricht dark:text-slate-100">
-            About These Analyses
+            About These Analyses — What They Mean &amp; What To Do With Them
           </h2>
         </div>
         <p className="mb-6 text-sm text-police dark:text-slate-300">
-          A plain-language guide to what each section shows and how to read it.
+          Each section below explains <strong>what the analysis measures</strong>,{' '}
+          <strong>why it matters to your clinic</strong>, and{' '}
+          <strong>what action you can take</strong> based on the result. This is meant to help
+          you make decisions — not just show numbers.
         </p>
 
         <div className="space-y-6">
           {/* Descriptive */}
-          <div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/20">
             <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
               Descriptive Analytics — “What happened?”
             </h3>
-            <p className="mt-1 text-sm text-police dark:text-slate-300">
-              This is a snapshot of the appointments in the selected period. The
-              <strong> donut chart</strong> shows which services were booked most, the
-              <strong> appointments by day</strong> line shows how volume changed across the
-              period, the <strong>status distribution</strong> bars break down how many
-              appointments were approved, rejected, completed, not completed, or cancelled,
-              and <strong>peak hours</strong> tells you which times of day see the most bookings.
-              It answers the basic question: “what actually happened during this time?”
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>What it measures:</strong> A snapshot of every appointment in the selected
+              period — which services were booked most, how volume changed day-to-day, which
+              statuses (approved/rejected/completed/not completed/cancelled) each appointment
+              reached, and which hours of the day are busiest.
+            </p>
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>Why it matters:</strong> This is your ground truth. It tells you exactly
+              what your clinic actually did during that time, so you can spot your biggest
+              services and your busiest moments.
+            </p>
+            <p className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-maastricht dark:bg-slate-800 dark:text-slate-200">
+              <strong>What to do with it:</strong> Use the <em>peak hours</em> chart to make sure
+              you have enough staff and chairs during your busiest times. Use the{' '}
+              <em>status distribution</em> to see how many appointments are never completed, and
+              the <em>service donut</em> to know which services bring in the most patients so you
+              can keep enough slots open for them.
             </p>
           </div>
 
           {/* Diagnostic */}
-          <div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/20">
             <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
               Diagnostic Analytics — “Why did it happen?”
             </h3>
-            <p className="mt-1 text-sm text-police dark:text-slate-300">
-              This digs deeper into patterns. The <strong>appointments by day of week</strong>{' '}
-              chart shows which weekdays are busiest or quietest, and the{' '}
-              <strong>service × day correlation</strong> table shows which services are most
-              popular on which days. This helps you plan staffing and promotions around real
-              booking patterns instead of guessing.
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>What it measures:</strong> Which weekdays are busiest or quietest, and
+              which services are most popular on which days of the week.
+            </p>
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>Why it matters:</strong> It turns raw volume into patterns. If Mondays are
+              always quiet but Fridays are packed, that affects staffing, promotions, and
+              appointment availability.
+            </p>
+            <p className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-maastricht dark:bg-slate-800 dark:text-slate-200">
+              <strong>What to do with it:</strong> Schedule your staff around your busiest days,
+              run promotions on slow days to fill empty slots, and consider offering discounts
+              for services that are under-booked on quiet weekdays.
             </p>
           </div>
 
           {/* Predictive */}
-          <div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/20">
             <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
               Predictive Analytics — “What might happen next?”
             </h3>
-            <p className="mt-1 text-sm text-police dark:text-slate-300">
-              This estimates next month’s demand using a rolling average of the previous few
-              months of appointment volume. It deliberately avoids aggressive growth formulas,
-              so the forecast is conservative and realistic. It’s a guide for capacity planning,
-              not an exact promise.
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>What it measures:</strong> A conservative forecast of next month’s
+              appointment volume, based on a rolling average of the previous few months.
+            </p>
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>Why it matters:</strong> It helps you prepare for the future instead of
+              reacting to the past. Knowing next month is likely to be busy lets you plan ahead.
+            </p>
+            <p className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-maastricht dark:bg-slate-800 dark:text-slate-200">
+              <strong>What to do with it:</strong> If the forecast is high, make sure you have
+              enough appointment slots open and staff scheduled. If it dips, run a promotion to
+              drive bookings. Treat it as a guide, not a guarantee.
             </p>
           </div>
 
           {/* Logistic Regression */}
-          <div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/20">
             <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
-              Logistic Regression — “How likely is an appointment to be completed?”
+              Logistic Regression — “How likely is an appointment to actually happen?”
             </h3>
-            <p className="mt-1 text-sm text-police dark:text-slate-300">
-              This is a real statistical model (not raw counts). It learns from your finalized
-              appointments which factors are linked to completion — like the service booked,
-              the time of day, the day of the week, and whether it was a walk-in — and outputs a
-              continuous <strong>probability (0–100%)</strong> that an appointment will be
-              completed. It never forces a hard “yes/no” answer; instead it gives a risk score.
-              The <strong>S-curve</strong> shows how completion probability changes across the
-              hours of the day. The <strong>feature importance</strong> section shows which
-              factors most strongly increase or decrease the odds of completion, and the{' '}
-              <strong>model performance</strong> metrics (accuracy, precision, recall, F1, AUC)
-              tell you how well the model fits the data.
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>What it measures:</strong> A real statistical model that learns from your
+              finalized appointments which factors (service, time of day, weekday, walk-in vs
+              online) are linked to completion. It outputs a continuous{' '}
+              <strong>probability (0–100%)</strong> that an appointment will be completed — not a
+              hard “yes/no” label.
+            </p>
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>Why it matters:</strong> It shows you not just <em>how many</em> completed,
+              but <em>which kinds</em> of appointments are at risk of being no-shows so you can
+              intervene before they happen.
+            </p>
+            <p className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-maastricht dark:bg-slate-800 dark:text-slate-200">
+              <strong>What to do with it:</strong> Look at the <em>per-service</em> and{' '}
+              <em>per-day-of-week</em> probabilities to find which bookings are most likely to
+              no-show. Send a reminder or confirmation message to those high-risk appointments.
+              The <em>feature importance</em> list tells you which factors matter most — for
+              example, if “not completed” is strongly linked to a specific time slot, you can
+              adjust that slot or add a reminder.
             </p>
           </div>
 
           {/* Comparison */}
-          <div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/20">
             <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
-              Period Comparison — “How does this period compare to the last one?”
+              Period Comparison — “Are we growing or shrinking?”
             </h3>
-            <p className="mt-1 text-sm text-police dark:text-slate-300">
-              This compares the current month or year against the previous one and shows the
-              percentage change in total appointments. A green “+” means growth, a red “−“
-              means decline. It’s a quick pulse check on whether business is trending up or down.
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>What it measures:</strong> The change in total appointments between the
+              current period and the previous one, shown as a percentage.
+            </p>
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>Why it matters:</strong> A single month’s number doesn’t tell you much on
+              its own. Comparing it to the previous period shows your trend — up, down, or flat.
+            </p>
+            <p className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-maastricht dark:bg-slate-800 dark:text-slate-200">
+              <strong>What to do with it:</strong> If you see a strong increase, keep doing what
+              you’re doing. If you see a decline, investigate — check the diagnostic and
+              rejection sections to understand why, and run a promotion to recover.
             </p>
           </div>
 
           {/* Rejection & Cancellation */}
-          <div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/20">
             <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
               Rejection &amp; Cancellation Analysis — “Where are we losing appointments?”
             </h3>
-            <p className="mt-1 text-sm text-police dark:text-slate-300">
-              This highlights which services are being rejected most often or most frequently not
-              completed (no-shows). If a particular service has a high no-show rate, you may want
-              to follow up with those patients or adjust how those appointments are scheduled.
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>What it measures:</strong> Which services are rejected most often and which
+              have the highest number of appointments that never get completed (no-shows).
+            </p>
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>Why it matters:</strong> Lost appointments are lost revenue and wasted
+              staff time. Knowing which services are prone to no-shows lets you target the
+              problem.
+            </p>
+            <p className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-maastricht dark:bg-slate-800 dark:text-slate-200">
+              <strong>What to do with it:</strong> For services with high no-show rates, send
+              automatic reminders or require confirmation. For services being rejected often,
+              review why — is it overbooked, or is the patient being turned away for another
+              reason?
             </p>
           </div>
 
           {/* Status Timeline */}
-          <div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/20">
             <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
               Status Timeline — “How do appointments move through their lifecycle?”
             </h3>
-            <p className="mt-1 text-sm text-police dark:text-slate-300">
-              This stacked bar chart tracks how many appointments were approved, rejected,
-              completed, or not completed on each day of the period. It helps you spot days with
-              unusual outcomes — for example, a spike in no-shows on a particular date.
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>What it measures:</strong> A day-by-day stacked view of how many
+              appointments were approved, rejected, completed, or not completed on each date.
+            </p>
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>Why it matters:</strong> It reveals <em>when</em> problems happen. A spike
+              in no-shows on a specific day might point to a reservation issue, a holiday, or a
+              scheduling conflict.
+            </p>
+            <p className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-maastricht dark:bg-slate-800 dark:text-slate-200">
+              <strong>What to do with it:</strong> Spot days with unusual outcomes and dig into
+              the cause. If a particular day consistently has high no-shows, consider changing
+              how those slots are confirmed or promoted.
             </p>
           </div>
 
           {/* Walk-in vs Online */}
-          <div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/20">
             <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
               Walk-in vs Online — “How are patients booking?”
             </h3>
-            <p className="mt-1 text-sm text-police dark:text-slate-300">
-              This shows the split between patients who booked online and those who walked in.
-              It helps you understand which booking channel drives the most volume so you can
-              invest in the right one.
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>What it measures:</strong> The split between patients who booked online and
+              those who walked in without a booking.
+            </p>
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>Why it matters:</strong> It shows which channel your patients actually use,
+              so you know where to focus your marketing and scheduling effort.
+            </p>
+            <p className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-maastricht dark:bg-slate-800 dark:text-slate-200">
+              <strong>What to do with it:</strong> If most bookings are walk-ins, keep
+              walk-in-friendly slots open and make sure your front desk is prepared. If most are
+              online, invest in your online booking experience and reminders.
             </p>
           </div>
 
           {/* Service Trend */}
-          <div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/20">
             <h3 className="text-base font-semibold text-maastricht dark:text-slate-100">
               Service Popularity Trend — “Which services are growing or shrinking?”
             </h3>
-            <p className="mt-1 text-sm text-police dark:text-slate-300">
-              This shows the month-over-month demand for each service over the last six months.
-              It reveals which services are gaining traction and which ones may need more
-              promotion.
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>What it measures:</strong> The month-over-month demand for each service
+              over the last six months.
+            </p>
+            <p className="mt-2 text-sm text-police dark:text-slate-300">
+              <strong>Why it matters:</strong> It shows which services are getting more popular
+              and which are fading, so you can adjust your offerings and stock accordingly.
+            </p>
+            <p className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-maastricht dark:bg-slate-800 dark:text-slate-200">
+              <strong>What to do with it:</strong> Promote rising services to keep the momentum.
+              For declining services, either run a promotion or consider whether to keep
+              investing in them.
             </p>
           </div>
 

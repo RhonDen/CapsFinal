@@ -52,8 +52,13 @@ function Clients() {
   // Names use substring matching so typing "Geo" immediately shows "George",
   // and a name is matched whether it appears as a first name OR last name
   // (e.g. "George" matches both "George Cruz" and "Maria George").
-  // Phone numbers use partial digit matching so searching a number shows
-  // every person sharing that number (even with different names).
+  // IMPORTANT: each typed token is matched against EACH individual name
+  // field separately (first name, last name, full name). This prevents
+  // false matches that span across two joined names (e.g. searching "zge"
+  // must NOT match because "z" is at the end of "Cruz" and "ge" is the
+  // start of "George" — they are different fields).
+  // Phone numbers are normalized on BOTH sides (handles E.164 "+63917..."
+  // vs the "09..." the admin types) so partial typing works immediately.
   const filteredClients = useMemo(() => {
     let result = clients;
     const nameQuery = searchQuery.trim().toLowerCase();
@@ -62,30 +67,50 @@ function Clients() {
     if (nameQuery) {
       const nameParts = nameQuery.split(/\s+/).filter(Boolean);
       result = result.filter((client) => {
-        // Build a searchable string from full name AND each individual
-        // name token (first & last) so substring matches work across both.
-        const firstName = String(client.firstName || '').toLowerCase();
-        const lastName = String(client.lastName || '').toLowerCase();
-        const fullName = getClientName(client).toLowerCase();
-        const allNames = (Array.isArray(client.allNames) ? client.allNames : [])
-          .map((n) => String(n || '').toLowerCase())
-          .join(' ');
+        // Collect each name field as its OWN string (no concatenation).
+        const nameFields = [
+          String(client.firstName || ''),
+          String(client.lastName || ''),
+          getClientName(client),
+          ...(Array.isArray(client.allNames) ? client.allNames : []),
+        ]
+          .map((n) => String(n || '').trim().toLowerCase())
+          .filter(Boolean);
 
-        const haystack = [fullName, firstName, lastName, allNames]
-          .filter(Boolean)
-          .join(' ');
-
-        // Every typed token must appear as a substring somewhere in the name.
-        return nameParts.every((part) => haystack.includes(part));
+        // Every typed token must be a substring of at least ONE name field.
+        // This ensures a token never accidentally spans two different names.
+        return nameParts.every((part) =>
+          nameFields.some((field) => field.includes(part))
+        );
       });
     }
     if (phoneQuery) {
-      // Partial digit matching: any client whose number contains the
-      // searched digits (last 10 digits) is included. This surfaces all
-      // people sharing the same number, each with their own name.
+      // Normalize the query: if the admin types "09...", also try the
+      // E.164 form "639..." (and vice-versa) so partial typing works.
+      const qDigits = phoneQuery;
+      const q63 = qDigits.startsWith('0')
+        ? '63' + qDigits.slice(1)
+        : qDigits.startsWith('63')
+        ? '0' + qDigits.slice(2)
+        : qDigits;
+
       result = result.filter((client) => {
-        const digits = String(client.number || '').replace(/\D/g, '');
-        return digits.slice(-10).includes(phoneQuery.slice(-10));
+        const rawDigits = String(client.number || '').replace(/\D/g, '');
+        const last10 = rawDigits.slice(-10);
+        // Also build a "0-prefixed" variant of the stored number so a
+        // search for "09..." matches "+63917..." correctly.
+        const withZero = last10.startsWith('63')
+          ? '0' + last10.slice(2)
+          : last10;
+
+        return (
+          rawDigits.includes(qDigits) ||
+          rawDigits.includes(q63) ||
+          last10.includes(qDigits) ||
+          last10.includes(q63) ||
+          withZero.includes(qDigits) ||
+          withZero.includes(q63)
+        );
       });
     }
     return result;
