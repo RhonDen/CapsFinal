@@ -364,191 +364,6 @@ function AdminDashboard() {
             <div className="grid gap-4 2xl:grid-cols-[1.15fr_0.85fr]">
               <div className="space-y-4">
                 <section className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-xl font-semibold text-maastricht dark:text-slate-100">Pending requests</h2>
-                      <p className="text-xs text-police dark:text-slate-400">Approve or reject new bookings after OTP verification.</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {dashboard.pendingAppointments.map((appointment) => (
-                      <article
-                        key={appointment.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-600 dark:bg-slate-700"
-                      >
-                        <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                          <div className="min-w-0">
-                            <div className="mb-1.5 flex flex-wrap items-center gap-2">{typePill(appointment)}</div>
-                            <h3 className="break-words text-lg font-semibold text-maastricht dark:text-slate-100">
-                              {appointment.fullName}
-                            </h3>
-                            <p className="mt-0.5 text-base font-semibold text-police dark:text-slate-300">{appointment.number}</p>
-                          </div>
-
-                          <span
-                            className={`mt-1 inline-flex w-max items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusTone(
-                              appointment.status
-                            )}`}
-                          >
-                            {appointment.statusLabel}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                          <div className="rounded-xl bg-white/70 p-3 dark:bg-slate-800/60">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Service</p>
-                            <p className="mt-0.5 text-sm font-semibold text-maastricht dark:text-slate-100">
-                              {formatServiceLabel(appointment.service)}
-                            </p>
-                          </div>
-                          <div className="rounded-xl bg-white/70 p-3 dark:bg-slate-800/60">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Time</p>
-                            <p className="mt-0.5 text-sm font-semibold text-maastricht dark:text-slate-100">
-                              {formatDateKey(appointment.dateKey, { month: 'long', day: 'numeric', year: 'numeric' })} at{' '}
-                              {formatTimeLabel(appointment.time)}
-                            </p>
-                            <p className="mt-0.5 text-xs text-police dark:text-slate-300">Slot length: {appointment.durationMinutes} minutes</p>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                          <button
-                            type="button"
-                            onClick={() => updateStatus(appointment.id, 'accepted')}
-                            disabled={!appointment.canApprove || statusLoadingId === `${appointment.id}:accepted`}
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
-                          >
-                            {statusLoadingId === `${appointment.id}:accepted` ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <CheckCircle2 className="h-4 w-4" />
-                            )}
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRejectModal({ open: true, appointmentId: appointment.id })}
-                            disabled={statusLoadingId === `${appointment.id}:rejected`}
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
-                          >
-                            {statusLoadingId === `${appointment.id}:rejected` ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <XCircle className="h-4 w-4" />
-                            )}
-                            Reject
-                          </button>
-                        </div>
-
-                        {!appointment.canApprove ? (
-                          <p className="mt-2 text-xs text-amber-700">
-                            This booking cannot be approved until it has a valid scheduled time.
-                          </p>
-                        ) : null}
-                      </article>
-                    ))}
-                  </div>
-
-                  {dashboard.pendingAppointments.length === 0 ? (
-                    <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-sm text-police dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                      No pending requests right now.
-                    </div>
-                  ) : null}
-                </section>
-
-                <section className="rounded-3xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm dark:border-amber-700/50 dark:bg-amber-900/20">
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold text-maastricht dark:text-slate-100">Pending outcome</h2>
-                    <p className="text-xs text-police dark:text-slate-400">
-                      Walk-in appointments that passed their scheduled time but were not yet marked as completed or not completed.
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    {(dashboard.pendingOutcomeAppointments || []).map((appointment) => (
-                      <article
-                        key={appointment.id}
-                        className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-700/50 dark:bg-slate-700"
-                      >
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Name</p>
-                            <h3 className="mt-0.5 break-words text-lg font-semibold text-maastricht dark:text-slate-100">{appointment.fullName}</h3>
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Service</p>
-                            <p className="mt-0.5 text-base font-semibold text-police dark:text-slate-200">{formatServiceLabel(appointment.service)}</p>
-                          </div>
-
-                          <div className="min-w-0 md:col-span-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Time</p>
-                            <p className="mt-0.5 text-base font-semibold text-maastricht dark:text-slate-100">
-                              {formatDateKey(appointment.dateKey, { month: 'long', day: 'numeric', year: 'numeric' })} at {formatTimeLabel(appointment.time)}
-                              <span className="text-police dark:text-slate-300">
-                                {appointment.time && appointment.durationMinutes ? ' to ' : ''}
-                              </span>
-                              {appointment.time && appointment.durationMinutes
-                                ? computeEndTimeLabel(appointment.time, appointment.durationMinutes)
-                                : ''}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusTone(
-                                appointment.status
-                              )}`}
-                            >
-                              {appointment.statusLabel}
-                            </span>
-                            <div>{typePill(appointment)}</div>
-                          </div>
-
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            <button
-                              type="button"
-                              onClick={() => updateStatus(appointment.id, 'completed')}
-                              disabled={statusLoadingId === `${appointment.id}:completed`}
-                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
-                            >
-                              {statusLoadingId === `${appointment.id}:completed` ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <CheckCircle2 className="h-4 w-4" />
-                              )}
-                              Completed
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => updateStatus(appointment.id, 'notCompleted')}
-                              disabled={statusLoadingId === `${appointment.id}:notCompleted`}
-                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
-                            >
-                              {statusLoadingId === `${appointment.id}:notCompleted` ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Clock3 className="h-4 w-4" />
-                              )}
-                              Not Completed
-                            </button>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-
-                  {(dashboard.pendingOutcomeAppointments || []).length === 0 ? (
-                    <div className="mt-3 rounded-2xl border border-dashed border-amber-300 bg-white/60 p-6 text-sm text-police dark:border-amber-700/50 dark:bg-slate-700 dark:text-slate-300">
-                      No walk-in appointments are waiting for an outcome.
-                    </div>
-                  ) : null}
-                </section>
-
-                <section className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
                   <div className="mb-4">
                     <h2 className="text-xl font-semibold text-maastricht dark:text-slate-100">Today&apos;s schedule</h2>
                     <p className="text-xs text-police dark:text-slate-400">A cleaner daily layout for the appointments that matter most today.</p>
@@ -669,10 +484,98 @@ function AdminDashboard() {
                     </div>
                   </div>
                 </section>
-              </div>
 
-              <div className="space-y-4">
-                <section className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
+                <section className="rounded-3xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm dark:border-amber-700/50 dark:bg-amber-900/20">
+                  <div className="mb-4">
+                    <h2 className="text-xl font-semibold text-maastricht dark:text-slate-100">Pending outcome</h2>
+                    <p className="text-xs text-police dark:text-slate-400">
+                      Walk-in appointments that passed their scheduled time but were not yet marked as completed or not completed.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {(dashboard.pendingOutcomeAppointments || []).map((appointment) => (
+                      <article
+                        key={appointment.id}
+                        className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-700/50 dark:bg-slate-700"
+                      >
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Name</p>
+                            <h3 className="mt-0.5 break-words text-lg font-semibold text-maastricht dark:text-slate-100">{appointment.fullName}</h3>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Service</p>
+                            <p className="mt-0.5 text-base font-semibold text-police dark:text-slate-200">{formatServiceLabel(appointment.service)}</p>
+                          </div>
+
+                          <div className="min-w-0 md:col-span-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-silver-lake dark:text-slate-300">Time</p>
+                            <p className="mt-0.5 text-base font-semibold text-maastricht dark:text-slate-100">
+                              {formatDateKey(appointment.dateKey, { month: 'long', day: 'numeric', year: 'numeric' })} at {formatTimeLabel(appointment.time)}
+                              <span className="text-police dark:text-slate-300">
+                                {appointment.time && appointment.durationMinutes ? ' to ' : ''}
+                              </span>
+                              {appointment.time && appointment.durationMinutes
+                                ? computeEndTimeLabel(appointment.time, appointment.durationMinutes)
+                                : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusTone(
+                                appointment.status
+                              )}`}
+                            >
+                              {appointment.statusLabel}
+                            </span>
+                            <div>{typePill(appointment)}</div>
+                          </div>
+
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <button
+                              type="button"
+                              onClick={() => updateStatus(appointment.id, 'completed')}
+                              disabled={statusLoadingId === `${appointment.id}:completed`}
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {statusLoadingId === `${appointment.id}:completed` ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-4 w-4" />
+                              )}
+                              Completed
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateStatus(appointment.id, 'notCompleted')}
+                              disabled={statusLoadingId === `${appointment.id}:notCompleted`}
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {statusLoadingId === `${appointment.id}:notCompleted` ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Clock3 className="h-4 w-4" />
+                              )}
+                              Not Completed
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+
+                  {(dashboard.pendingOutcomeAppointments || []).length === 0 ? (
+                    <div className="mt-3 rounded-2xl border border-dashed border-amber-300 bg-white/60 p-6 text-sm text-police dark:border-amber-700/50 dark:bg-slate-700 dark:text-slate-300">
+                      No walk-in appointments are waiting for an outcome.
+                    </div>
+                  ) : null}
+                </section>
+              </div>
                   <div className="mb-4">
                     <h2 className="text-xl font-semibold text-maastricht dark:text-slate-100">Upcoming appointments</h2>
                     <p className="text-xs text-police dark:text-slate-400">The next closest approved schedules from now.</p>

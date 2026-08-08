@@ -305,7 +305,7 @@ router.get(
           status: { [Op.in]: ['accepted', 'rejected', 'completed', 'notCompleted', 'cancelled'] },
           time: { [Op.ne]: null },
         },
-        order: [['scheduledStart', 'ASC'], ['createdAt', 'ASC']],
+        order: [['scheduledStart', 'DESC'], ['createdAt', 'DESC']],
       }),
       // Upcoming: future dates only (tomorrow onwards), excluding today's appointments.
       // Also includes records that have scheduledStart OR have a dateKey >= tomorrow
