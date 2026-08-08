@@ -86,9 +86,9 @@ function Clients() {
     let result = clients;
     const searchValue = searchQuery.trim().toLowerCase();
     const phoneQuery = normalizePhoneDigits(phoneFilter);
+    const searchTokens = searchValue.split(/\s+/).filter(Boolean);
 
-    if (searchValue) {
-      const searchTokens = searchValue.split(/\s+/).filter(Boolean);
+    if (searchTokens.length > 0) {
       result = result.filter((client) => {
         const nameFields = [
           String(client.firstName || ''),
@@ -100,15 +100,15 @@ function Clients() {
           .filter(Boolean);
 
         const allNameText = nameFields.join(' ');
-        const rawDigits = String(client.number || '').replace(/\D/g, '');
+        const rawDigits = normalizePhoneDigits(client.number);
 
         return searchTokens.every((token) => {
           const tokenDigits = normalizePhoneDigits(token);
-          const tokenNameMatch = tokenDigits ? false : allNameText.includes(token);
-          const tokenPhoneMatch = tokenDigits
+          const nameMatch = allNameText.includes(token);
+          const numberMatch = tokenDigits
             ? buildPhoneSearchVariants(token).some((variant) => rawDigits.includes(variant))
             : false;
-          return tokenNameMatch || tokenPhoneMatch;
+          return nameMatch || numberMatch;
         });
       });
     }
@@ -116,10 +116,11 @@ function Clients() {
     if (phoneQuery) {
       const phoneVariants = buildPhoneSearchVariants(phoneFilter);
       result = result.filter((client) => {
-        const rawDigits = String(client.number || '').replace(/\D/g, '');
+        const rawDigits = normalizePhoneDigits(client.number);
         return phoneVariants.some((variant) => rawDigits.includes(variant));
       });
     }
+
     return result;
   }, [clients, searchQuery, phoneFilter]);
 
